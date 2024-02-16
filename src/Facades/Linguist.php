@@ -9,8 +9,8 @@ use Illuminate\Support\Facades\Facade;
  */
 class Linguist extends Facade
 {
-    protected static function getFacadeAccessor()
-    {
-        return \Hyperlinkgroup\Linguist\Linguist::class;
-    }
+	protected static function getFacadeAccessor()
+	{
+		return \Hyperlinkgroup\Linguist\Linguist::class;
+	}
 }

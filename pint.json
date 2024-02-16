@@ -1,0 +1,8 @@
+{
+    "indent": "\t",
+    "rules": {
+        "concat_space" : {
+            "spacing": "one"
+        }
+    }
+}

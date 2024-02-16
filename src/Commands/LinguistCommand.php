@@ -6,14 +6,14 @@ use Illuminate\Console\Command;
 
 class LinguistCommand extends Command
 {
-    public $signature = 'linguist';
+	public $signature = 'linguist';
 
-    public $description = 'My command';
+	public $description = 'My command';
 
-    public function handle(): int
-    {
-        $this->comment('All done');
+	public function handle(): int
+	{
+		$this->comment('All done');
 
-        return self::SUCCESS;
-    }
+		return self::SUCCESS;
+	}
 }

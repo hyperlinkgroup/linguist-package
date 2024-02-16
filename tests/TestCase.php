@@ -2,9 +2,9 @@
 
 namespace Hyperlinkgroup\Linguist\Tests;
 
+use Hyperlinkgroup\Linguist\LinguistServiceProvider;
 use Illuminate\Database\Eloquent\Factories\Factory;
 use Orchestra\Testbench\TestCase as Orchestra;
-use Hyperlinkgroup\Linguist\LinguistServiceProvider;
 
 class TestCase extends Orchestra
 {
@@ -13,7 +13,7 @@ class TestCase extends Orchestra
 		parent::setUp();
 
 		Factory::guessFactoryNamesUsing(
-			static fn (string $modelName) => 'Hyperlinkgroup\\Linguist\\Database\\Factories\\'.class_basename($modelName).'Factory'
+			static fn (string $modelName) => 'Hyperlinkgroup\\Linguist\\Database\\Factories\\' . class_basename($modelName) . 'Factory'
 		);
 	}
 
