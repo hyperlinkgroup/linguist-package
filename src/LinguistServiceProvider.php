@@ -15,4 +15,13 @@ class LinguistServiceProvider extends PackageServiceProvider
 			->hasConfigFile()
 			->hasCommand(LinguistCommand::class);
 	}
+
+	public function boot(): void
+	{
+		parent::boot();
+
+		$this->app->singleton(Linguist::class, function () {
+			return new Linguist();
+		});
+	}
 }
