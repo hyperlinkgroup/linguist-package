@@ -4,8 +4,45 @@ use Hyperlinkgroup\Linguist\Exceptions\ConfigBrokenException;
 use Hyperlinkgroup\Linguist\Exceptions\NoLanguageActivatedException;
 use Hyperlinkgroup\Linguist\Facades\Linguist;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
+
+use function PHPUnit\Framework\assertFileDoesNotExist;
+use function PHPUnit\Framework\assertFileExists;
+
+beforeEach(function () {
+	cleanUp();
+});
+
+afterEach(function () {
+	cleanUp();
+});
+
+function cleanUp(): void
+{
+	if (File::exists(base_path('lang'))) {
+		collect(File::files(base_path('lang')))->each(function (SplFileInfo $file) {
+			File::delete($file->getPathname());
+		});
+
+		File::deleteDirectory(base_path('lang'));
+	}
+
+	if (File::exists(storage_path('tmp/translations'))) {
+		collect(File::files(storage_path('tmp/translations')))->each(function (SplFileInfo $file) {
+			File::delete($file->getPathname());
+		});
+	}
+
+	if (File::exists(storage_path('tmp'))) {
+		collect(File::files(storage_path('tmp')))->each(function (SplFileInfo $file) {
+			File::delete($file->getPathname());
+		});
+	}
+
+	File::deleteDirectory(storage_path('tmp'));
+}
 
 test('that we get an exception when project is not set', function () {
 	config(['linguist.project' => '']);
@@ -57,8 +94,6 @@ test('that we get an exception while getting all languages if the list is empty'
 })->throws(NoLanguageActivatedException::class);
 
 test('that we can create directories', function () {
-	Storage::fake('local');
-
 	$languages = collect(['EN', 'DE']);
 	config(['linguist.temporary_directory' => 'tmp/translations']);
 
@@ -67,15 +102,13 @@ test('that we can create directories', function () {
 		->createDirectories();
 
 	$languages->each(function (string $language) {
-		Storage::assertExists(base_path("lang/$language"));
+		assertFileExists(base_path("lang/$language"));
 	});
 
-	Storage::assertExists(storage_path(config('linguist.temporary_directory')));
+	assertFileExists(storage_path(config('linguist.temporary_directory')));
 });
 
 test('that we can download the files', function () {
-	Storage::fake('local');
-
 	$languages = collect(['EN', 'DE']);
 	config(['linguist.temporary_directory' => 'tmp/translations']);
 	config(['linguist.project' => 'project']);
@@ -100,16 +133,15 @@ test('that we can download the files', function () {
 
 	Linguist::start()
 		->setLanguages($languages)
+		->createDirectories()
 		->downloadFiles();
 
 	$languages->each(function (string $language) {
-		Storage::assertExists(storage_path(config('linguist.temporary_directory') . "/$language.json"));
+		assertFileExists(storage_path(config('linguist.temporary_directory') . "/$language.json"));
 	});
 });
 
 test('that we can move the files', function () {
-	Storage::fake('local');
-
 	$languages = collect(['EN', 'DE']);
 	config(['linguist.temporary_directory' => 'tmp/translations']);
 	config(['linguist.project' => 'project']);
@@ -118,22 +150,21 @@ test('that we can move the files', function () {
 		->setLanguages($languages)
 		->createDirectories();
 
-	Storage::put(storage_path('tmp/translations/EN.json'), json_encode(['Test' => 'Test English Translation'], JSON_THROW_ON_ERROR));
-	Storage::put(storage_path('tmp/translations/DE.json'), json_encode(['Test' => 'Test German Translation'], JSON_THROW_ON_ERROR));
+	File::put(storage_path('tmp/translations/EN.json'), json_encode(['Test' => 'Test English Translation'], JSON_THROW_ON_ERROR));
+	File::put(storage_path('tmp/translations/DE.json'), json_encode(['Test' => 'Test German Translation'], JSON_THROW_ON_ERROR));
 
 	Linguist::start()
 		->moveFiles();
 
 	$languages->each(function (string $language) {
-		Storage::assertExists(base_path("lang/$language/project.json"));
+		assertFileExists(base_path("lang/$language/project.json"));
 	});
 
-	Storage::assertMissing(storage_path(config('linguist.temporary_directory')));
+	assertFileDoesNotExist(storage_path(config('linguist.temporary_directory')));
 });
 
 test('that we can execute the command', function () {
-	Storage::fake('local');
-
+	config(['linguist.temporary_directory' => 'tmp/translations']);
 	config(['linguist.project' => 'project']);
 	config(['linguist.token' => 'token']);
 
@@ -162,8 +193,8 @@ test('that we can execute the command', function () {
 	Linguist::start()->handle();
 
 	$languages->each(function (string $language) {
-		Storage::assertExists(base_path("lang/$language/project.json"));
+		assertFileExists(base_path("lang/$language/project.json"));
 	});
 
-	Storage::assertMissing(storage_path(config('linguist.temporary_directory')));
+	assertFileDoesNotExist(storage_path(config('linguist.temporary_directory')));
 });

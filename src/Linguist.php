@@ -3,13 +3,12 @@
 namespace Hyperlinkgroup\Linguist;
 
 use Hyperlinkgroup\Linguist\Exceptions\ConfigBrokenException;
-use Hyperlinkgroup\Linguist\Exceptions\DirectoryCreationException;
 use Hyperlinkgroup\Linguist\Exceptions\NoLanguageActivatedException;
 use Illuminate\Http\Client\PendingRequest;
 use Illuminate\Http\Client\Response;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Http;
-use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 
 class Linguist
@@ -32,7 +31,6 @@ class Linguist
 
 	/**
 	 * @throws ConfigBrokenException
-	 * @throws DirectoryCreationException
 	 * @throws NoLanguageActivatedException
 	 */
 	public function handle(): void
@@ -167,7 +165,7 @@ class Linguist
 		$paths->push(storage_path($this->getTemporaryDirectory()));
 
 		$paths->each(function ($path) {
-			Storage::createDirectory($path);
+			File::ensureDirectoryExists($path);
 		});
 	}
 
@@ -215,7 +213,7 @@ class Linguist
 			$response = $this->getHttp()
 				->get($route);
 
-			Storage::put(storage_path($this->getTemporaryDirectory() . "/$language.json"), $response->body());
+			File::put(storage_path($this->getTemporaryDirectory() . "/$language.json"), $response->body());
 		}
 
 		return $this;
@@ -226,16 +224,16 @@ class Linguist
 	 */
 	public function moveFiles(): self
 	{
-		$files = Storage::files(storage_path($this->getTemporaryDirectory()));
+		$files = File::files(storage_path($this->getTemporaryDirectory()));
 
 		foreach ($files as $file) {
-			$language = Str::beforeLast(Str::afterLast($file, '/'), '.');
+			$language = $file->getFilenameWithoutExtension();
 			$destination = base_path("lang/$language/$this->project.json");
 
-			Storage::move($file, $destination);
+			File::move($file, $destination);
 		}
 
-		Storage::deleteDirectory(storage_path($this->getTemporaryDirectory()));
+		File::deleteDirectory(storage_path($this->getTemporaryDirectory()));
 
 		return $this;
 	}
