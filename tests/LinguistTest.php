@@ -20,12 +20,12 @@ afterEach(function () {
 
 function cleanUp(): void
 {
-	if (File::exists(base_path('lang'))) {
-		collect(File::files(base_path('lang')))->each(function (SplFileInfo $file) {
+	if (File::exists(lang_path())) {
+		collect(File::files(lang_path()))->each(function (SplFileInfo $file) {
 			File::delete($file->getPathname());
 		});
 
-		File::deleteDirectory(base_path('lang'));
+		File::deleteDirectory(lang_path());
 	}
 
 	if (File::exists(storage_path('tmp/translations'))) {
@@ -101,7 +101,7 @@ test('that we can create directories', function () {
 		->createDirectories();
 
 	$languages->each(function (string $language) {
-		assertFileExists(base_path("lang/$language"));
+		assertFileExists(lang_path("$language"));
 	});
 
 	assertFileExists(storage_path(config('linguist.temporary_directory')));
@@ -156,7 +156,7 @@ test('that we can move the files', function () {
 		->moveFiles();
 
 	$languages->each(function (string $language) {
-		assertFileExists(base_path("lang/$language/project.json"));
+		assertFileExists(lang_path("$language/project.json"));
 	});
 
 	assertFileDoesNotExist(storage_path(config('linguist.temporary_directory')));
@@ -192,7 +192,7 @@ test('that we can execute the command', function () {
 	Linguist::start()->handle();
 
 	$languages->each(function (string $language) {
-		assertFileExists(base_path("lang/$language/project.json"));
+		assertFileExists(lang_path("$language/project.json"));
 	});
 
 	assertFileDoesNotExist(storage_path(config('linguist.temporary_directory')));
