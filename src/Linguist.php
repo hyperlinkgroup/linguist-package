@@ -159,7 +159,7 @@ class Linguist
 		$paths = collect();
 
 		$this->languages->each(function ($language) use (&$paths) {
-			$paths->push(base_path("lang/$language"));
+			$paths->push(lang_path($language));
 		});
 
 		$paths->push(storage_path($this->getTemporaryDirectory()));
@@ -228,7 +228,7 @@ class Linguist
 
 		foreach ($files as $file) {
 			$language = $file->getFilenameWithoutExtension();
-			$destination = base_path("lang/$language/$this->project.json");
+			$destination = lang_path("$language/$this->project.json");
 
 			File::move($file, $destination);
 		}
