@@ -159,7 +159,7 @@ class Linguist
 		$paths = collect();
 
 		$this->languages->each(function ($language) use (&$paths) {
-			$paths->push(lang_path("$language"));
+			$paths->push(lang_path($language));
 		});
 
 		$paths->push(storage_path($this->getTemporaryDirectory()));
