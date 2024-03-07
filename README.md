@@ -7,6 +7,8 @@
 
 A package to help you download your language files from [Linguist](https://app.linguist.eu).
 
+<img src="./art/header.jpg" alt="linguist-package-header">
+
 ## Installation
 
 You can install the package via composer:
