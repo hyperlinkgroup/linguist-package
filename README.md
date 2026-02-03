@@ -1,11 +1,11 @@
-# This is my package linguist
+# Linguist Connector for Laravel 
 
 [![Latest Version on Packagist](https://img.shields.io/packagist/v/hyperlinkgroup/linguist.svg?style=flat-square)](https://packagist.org/packages/hyperlinkgroup/linguist)
 [![GitHub Tests Action Status](https://img.shields.io/github/actions/workflow/status/hyperlinkgroup/linguist-package/run-tests.yml?branch=main&label=tests&style=flat-square)](https://github.com/hyperlinkgroup/linguist/actions?query=workflow%3Arun-tests+branch%3Amain)
 [![GitHub Code Style Action Status](https://img.shields.io/github/actions/workflow/status/hyperlinkgroup/linguist-package/fix-php-code-style-issues.yml?branch=main&label=code%20style&style=flat-square)](https://github.com/hyperlinkgroup/linguist/actions?query=workflow%3A"Fix+PHP+code+style+issues"+branch%3Amain)
 [![Total Downloads](https://img.shields.io/packagist/dt/hyperlink/linguist.svg?style=flat-square)](https://packagist.org/packages/hyperlink/linguist)
 
-A package to help you download your language files from [Linguist](https://app.linguist.eu).
+A package to help you download your language files from [Linguist](https://app.linguist.eu) — A better way to manage you language files.
 
 <img src="./art/header.jpg" alt="linguist-package-header">
 
@@ -68,23 +68,6 @@ return [
 ```bash
 composer test
 ```
-
-## Changelog
-
-Please see [CHANGELOG](CHANGELOG.md) for more information on what has changed recently.
-
-## Contributing
-
-Please see [CONTRIBUTING](CONTRIBUTING.md) for details.
-
-## Security Vulnerabilities
-
-Please review [our security policy](../../security/policy) on how to report security vulnerabilities.
-
-## Credits
-
-- [Katalam](https://github.com/Katalam)
-- [All Contributors](../../contributors)
 
 ## License
 
