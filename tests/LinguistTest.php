@@ -221,13 +221,13 @@ test('artisan command succeeds with valid configuration', function () {
 		]),
 	]);
 
-	$this->artisan('linguist:sync')
+	$this->artisan('linguist:sync --mode=sync')
 		->assertSuccessful()
-		->expectsOutput('Syncing translations from Linguist...')
-		->expectsOutput('Translations synced successfully.');
+		->expectsOutputToContain('Starting linguist sync...')
+		->expectsOutputToContain('Sync completed');
 
 	$languages->each(function (string $language) {
-		assertFileExists(lang_path("$language/project.json"));
+		assertFileExists(lang_path("$language/linguist.json"));
 	});
 });
 
@@ -237,7 +237,7 @@ test('artisan command fails when project is not configured', function () {
 
 	$this->artisan('linguist:sync')
 		->assertFailed()
-		->expectsOutput('The linguist project is not available');
+		->expectsOutputToContain('Linguist is not configured');
 });
 
 test('artisan command fails when token is not configured', function () {
@@ -246,7 +246,7 @@ test('artisan command fails when token is not configured', function () {
 
 	$this->artisan('linguist:sync')
 		->assertFailed()
-		->expectsOutput('The linguist token is not available');
+		->expectsOutputToContain('Linguist is not configured');
 });
 
 test('artisan command fails when no languages are activated', function () {
@@ -261,7 +261,7 @@ test('artisan command fails when no languages are activated', function () {
 		]),
 	]);
 
-	$this->artisan('linguist:sync')
+	$this->artisan('linguist:sync --mode=pull')
 		->assertFailed()
-		->expectsOutput('No languages are activated in your Linguist project.');
+		->expectsOutputToContain('No languages are activated in your Linguist project.');
 });
