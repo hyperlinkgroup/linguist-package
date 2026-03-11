@@ -11,8 +11,7 @@ use Illuminate\Support\Facades\Facade;
  *
  * @method static void handle()
  * @method static Collection getLanguages()
- * @method static LinguistClass setLanguages(Collection $collect)
- * @method static LinguistClass start()
+ * @method static LinguistClass setLanguages(Collection $languages)
  */
 class Linguist extends Facade
 {

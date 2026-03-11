@@ -2,18 +2,34 @@
 
 namespace Hyperlinkgroup\Linguist\Commands;
 
+use Hyperlinkgroup\Linguist\Linguist;
 use Illuminate\Console\Command;
+use Symfony\Component\Console\Command\Command as SymfonyCommand;
 
 class LinguistCommand extends Command
 {
-	public $signature = 'linguist';
+	protected $signature = 'linguist:sync';
 
-	public $description = 'My command';
+	protected $description = 'Download translation files from Linguist';
 
-	public function handle(): int
+	public function handle(Linguist $linguist): int
 	{
-		$this->comment('All done');
+		$this->info('Syncing translations from Linguist...');
 
-		return self::SUCCESS;
+		try {
+			$linguist->handle();
+
+			$this->info('Translations synced successfully.');
+
+			return SymfonyCommand::SUCCESS;
+		} catch (\Hyperlinkgroup\Linguist\Exceptions\ConfigBrokenException $e) {
+			$this->error($e->getMessage());
+
+			return SymfonyCommand::FAILURE;
+		} catch (\Hyperlinkgroup\Linguist\Exceptions\NoLanguageActivatedException $e) {
+			$this->error('No languages are activated in your Linguist project.');
+
+			return SymfonyCommand::FAILURE;
+		}
 	}
 }
