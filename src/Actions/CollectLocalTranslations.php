@@ -10,6 +10,7 @@ use Lorisleiva\Actions\Concerns\AsAction;
 final class CollectLocalTranslations
 {
 	use AsAction;
+
 	private const LINGUIST_FILENAME = 'linguist.json';
 
 	/**

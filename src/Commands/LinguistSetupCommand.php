@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace Hyperlinkgroup\Linguist\Commands;
 
-use Hyperlinkgroup\Linguist\Actions\PersistLinguistConfig;
 use Hyperlinkgroup\Linguist\Actions\CollectLocalTranslations;
+use Hyperlinkgroup\Linguist\Actions\PersistLinguistConfig;
 use Hyperlinkgroup\Linguist\DTO\SetupInput;
 use Hyperlinkgroup\Linguist\Services\LinguistApiClient;
 use Hyperlinkgroup\Linguist\Services\SetupOrchestrator;

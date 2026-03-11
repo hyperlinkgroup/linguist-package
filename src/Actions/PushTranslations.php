@@ -11,6 +11,7 @@ use Lorisleiva\Actions\Concerns\AsAction;
 final class PushTranslations
 {
 	use AsAction;
+
 	private const BATCH_SIZE = 100;
 
 	public function __construct(

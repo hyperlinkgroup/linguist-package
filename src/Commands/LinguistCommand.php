@@ -2,15 +2,16 @@
 
 namespace Hyperlinkgroup\Linguist\Commands;
 
+use Hyperlinkgroup\Linguist\Actions\CollectLocalTranslations;
 use Hyperlinkgroup\Linguist\Actions\PersistLinguistConfig;
 use Hyperlinkgroup\Linguist\Actions\PullTranslations;
 use Hyperlinkgroup\Linguist\Actions\PushTranslations;
 use Hyperlinkgroup\Linguist\Actions\SyncTranslations;
-use Hyperlinkgroup\Linguist\Actions\CollectLocalTranslations;
 use Hyperlinkgroup\Linguist\DTO\SyncResult;
 use Hyperlinkgroup\Linguist\Services\LinguistApiClient;
 use Illuminate\Console\Command;
 use Symfony\Component\Console\Command\Command as SymfonyCommand;
+
 use function Laravel\Prompts\progress;
 use function Laravel\Prompts\select;
 use function Laravel\Prompts\table;
@@ -34,8 +35,7 @@ class LinguistCommand extends Command
 		PullTranslations $pullTranslations,
 		PushTranslations $pushTranslations,
 		LinguistApiClient $apiClient
-	): int
-	{
+	): int {
 		$projectSlug = (string) config('linguist.project');
 
 		if (! PersistLinguistConfig::hasValidConfig()) {
@@ -54,7 +54,7 @@ class LinguistCommand extends Command
 			return SymfonyCommand::FAILURE;
 		}
 
-		$this->components->info("Starting linguist sync...");
+		$this->components->info('Starting linguist sync...');
 
 		try {
 			$syncResult = match ($selectedMode) {
