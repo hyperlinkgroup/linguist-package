@@ -16,7 +16,7 @@ final class CollectLocalTranslations
 	/**
 	 * Collect all translation files from the local lang directory.
 	 *
-	 * @return array<string, array<string, string >> Array of language => [key => value]
+	 * @return array<string, array<string, string>> Array of language => [key => value]
 	 */
 	public function handle(?string $projectSlug = null): array
 	{
@@ -33,6 +33,10 @@ final class CollectLocalTranslations
 		});
 
 		foreach ($discoveredFiles as $discoveredFile) {
+			if (! self::shouldIncludeForProjectSlug($discoveredFile, $projectSlug)) {
+				continue;
+			}
+
 			$language = $discoveredFile['language'];
 
 			$translations[$language] = array_merge(
@@ -58,7 +62,7 @@ final class CollectLocalTranslations
 		$content = File::get($path);
 		$decoded = json_decode($content, true);
 
-		if (json_last_error() !== JSON_ERROR_NONE) {
+		if (json_last_error() !== JSON_ERROR_NONE || ! is_array($decoded)) {
 			return [];
 		}
 
@@ -103,9 +107,7 @@ final class CollectLocalTranslations
 				continue;
 			}
 
-			if ($projectSlug !== null
-				&& ! $discoveredFile['is_linguist_file']
-				&& $discoveredFile['filename_without_extension'] !== $projectSlug) {
+			if (! self::shouldIncludeForProjectSlug($discoveredFile, $projectSlug)) {
 				continue;
 			}
 
@@ -165,10 +167,12 @@ final class CollectLocalTranslations
 
 			$filenameWithoutExtension = $file->getFilenameWithoutExtension();
 			$isLinguistFile = strtolower($file->getFilename()) === self::LINGUIST_FILENAME;
+			$pathSegments = explode(DIRECTORY_SEPARATOR, $relativePath);
+			$topLevelSegment = $pathSegments[0] ?? '';
 
 			$language = $isLinguistFile
 				? basename($file->getPath())
-				: $filenameWithoutExtension;
+				: (self::isLanguageCodeLike($topLevelSegment) ? $topLevelSegment : $filenameWithoutExtension);
 
 			if ($isLinguistFile && $file->getPath() === $langPath) {
 				continue;
@@ -187,6 +191,26 @@ final class CollectLocalTranslations
 		}
 
 		return $discovered;
+	}
+
+	/**
+	 * Determine whether a path segment looks like a locale/language code.
+	 */
+	private static function isLanguageCodeLike(string $segment): bool
+	{
+		return (bool) preg_match('/^[A-Za-z]{2,3}(?:[_-][A-Za-z0-9]{2,8})*$/', $segment);
+	}
+
+	/**
+	 * @param  array{language: string, path: string, filename_without_extension: string, is_linguist_file: bool}  $discoveredFile
+	 */
+	private static function shouldIncludeForProjectSlug(array $discoveredFile, ?string $projectSlug): bool
+	{
+		if ($projectSlug === null || $discoveredFile['is_linguist_file']) {
+			return true;
+		}
+
+		return $discoveredFile['filename_without_extension'] === $projectSlug;
 	}
 
 	/**
