@@ -194,16 +194,6 @@ final class SetupOrchestrator
 	 */
 	public function validateApiToken(string $token): bool
 	{
-		// #region agent log
-		$this->debugLog('H2', 'SetupOrchestrator:validateApiToken', 'Starting token validation request', [
-			'base_url_config' => (string) config('linguist.url', 'https://api.linguist.eu/'),
-			'base_url_trimmed' => rtrim((string) config('linguist.url', 'https://api.linguist.eu/'), '/'),
-			'token_length' => strlen($token),
-			'token_trimmed_length' => strlen(trim($token)),
-			'token_has_whitespace_edges' => trim($token) !== $token,
-		]);
-		// #endregion
-
 		$client = new LinguistApiClient(
 			baseUrl: config('linguist.url', 'https://api.linguist.eu/'),
 			token: $token,
@@ -211,35 +201,6 @@ final class SetupOrchestrator
 
 		$response = $client->listProjects();
 
-		// #region agent log
-		$this->debugLog('H3', 'SetupOrchestrator:validateApiToken', 'Token validation response received', [
-			'status' => $response->status(),
-			'successful' => $response->successful(),
-			'request_url' => $response->effectiveUri()?->getPath(),
-			'request_url_full' => $response->effectiveUri() ? (string) $response->effectiveUri() : null,
-			'body_preview' => mb_substr($response->body(), 0, 300),
-		]);
-		// #endregion
-
 		return $response->successful();
-	}
-
-	private function debugLog(string $hypothesisId, string $location, string $message, array $data = []): void
-	{
-		$payload = json_encode([
-			'sessionId' => '22592b',
-			'runId' => 'run1',
-			'hypothesisId' => $hypothesisId,
-			'location' => $location,
-			'message' => $message,
-			'data' => $data,
-			'timestamp' => (int) floor(microtime(true) * 1000),
-		], JSON_UNESCAPED_SLASHES);
-
-		if (! is_string($payload)) {
-			return;
-		}
-
-		@file_put_contents('/Users/rubenmaurer/Offcloud/linguist-package/.cursor/debug-22592b.log', $payload . PHP_EOL, FILE_APPEND);
 	}
 }

@@ -59,12 +59,6 @@ final class LinguistSetupCommand extends Command
 		// Step 2: Validate token
 		$isTokenValid = $this->orchestrator->validateApiToken($apiToken);
 
-		// #region agent log
-		$this->debugLog('H4', 'LinguistSetupCommand:handle', 'Token validation result returned by orchestrator', [
-			'is_token_valid' => $isTokenValid,
-		]);
-		// #endregion
-
 		if (! $isTokenValid) {
 			$this->error('Invalid API token. Please check your token and try again.');
 
@@ -145,14 +139,6 @@ final class LinguistSetupCommand extends Command
 			label: 'Enter your Linguist API token',
 			required: true
 		);
-
-		// #region agent log
-		$this->debugLog('H1', 'LinguistSetupCommand:getApiToken', 'Token captured from wizard prompt', [
-			'length' => strlen($token),
-			'trimmed_length' => strlen(trim($token)),
-			'has_leading_or_trailing_whitespace' => trim($token) !== $token,
-		]);
-		// #endregion
 
 		if (trim($token) === '') {
 			$this->error('API token is required.');
@@ -369,22 +355,4 @@ final class LinguistSetupCommand extends Command
 		return SymfonyCommand::SUCCESS;
 	}
 
-	private function debugLog(string $hypothesisId, string $location, string $message, array $data = []): void
-	{
-		$payload = json_encode([
-			'sessionId' => '22592b',
-			'runId' => 'run1',
-			'hypothesisId' => $hypothesisId,
-			'location' => $location,
-			'message' => $message,
-			'data' => $data,
-			'timestamp' => (int) floor(microtime(true) * 1000),
-		], JSON_UNESCAPED_SLASHES);
-
-		if (! is_string($payload)) {
-			return;
-		}
-
-		@file_put_contents('/Users/rubenmaurer/Offcloud/linguist-package/.cursor/debug-22592b.log', $payload . PHP_EOL, FILE_APPEND);
-	}
 }
