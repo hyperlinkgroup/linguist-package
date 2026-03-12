@@ -354,5 +354,4 @@ final class LinguistSetupCommand extends Command
 
 		return SymfonyCommand::SUCCESS;
 	}
-
 }
