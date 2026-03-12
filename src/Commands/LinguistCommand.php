@@ -154,7 +154,7 @@ class LinguistCommand extends Command
 			$remoteKeyCount = null;
 		}
 
-		$this->components->info('Translation key summary:');
+		$this->components->info('Current translation status:');
 		$this->components->twoColumnDetail('Local Translation Keys', (string) $localKeyCount);
 		$this->components->twoColumnDetail('Linguist Project Translation Keys', $remoteKeyCount === null ? 'N/A' : (string) $remoteKeyCount);
 		$this->newLine();

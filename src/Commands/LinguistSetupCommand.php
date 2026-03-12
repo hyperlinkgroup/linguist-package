@@ -279,7 +279,7 @@ final class LinguistSetupCommand extends Command
 			}
 		}
 
-		$this->components->info('Translation key summary');
+		$this->components->info('Current translation status:');
 		$this->components->twoColumnDetail('Local keys discovered', (string) $localKeyCount);
 		$this->components->twoColumnDetail('Remote keys', $remoteKeyCount === null ? 'N/A' : (string) $remoteKeyCount);
 		$this->newLine();
