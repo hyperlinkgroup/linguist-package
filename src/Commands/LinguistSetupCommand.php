@@ -148,14 +148,13 @@ final class LinguistSetupCommand extends Command
 
 		// #region agent log
 		$this->debugLog('H1', 'LinguistSetupCommand:getApiToken', 'Token captured from wizard prompt', [
-			'is_null' => $token === null,
-			'length' => is_string($token) ? strlen($token) : 0,
-			'trimmed_length' => is_string($token) ? strlen(trim($token)) : 0,
-			'has_leading_or_trailing_whitespace' => is_string($token) ? trim($token) !== $token : false,
+			'length' => strlen($token),
+			'trimmed_length' => strlen(trim($token)),
+			'has_leading_or_trailing_whitespace' => trim($token) !== $token,
 		]);
 		// #endregion
 
-		if ($token === null || trim($token) === '') {
+		if (trim($token) === '') {
 			$this->error('API token is required.');
 
 			return null;
@@ -210,7 +209,7 @@ final class LinguistSetupCommand extends Command
 			required: true
 		);
 
-		if ($name === null || trim($name) === '') {
+		if (trim($name) === '') {
 			$this->error('Project name is required.');
 
 			return null;
