@@ -145,18 +145,18 @@ class LinguistCommand extends Command
 			->unique()
 			->count();
 
-		$remoteKeyCount = 0;
+		$remoteKeyCount = null;
 
 		try {
 			$apiClient->setProjectSlug($projectSlug);
 			$remoteKeyCount = $apiClient->countTranslationKeys();
 		} catch (\Throwable) {
-			$remoteKeyCount = 0;
+			$remoteKeyCount = null;
 		}
 
-		$this->components->info('Key discovery summary');
-		$this->components->twoColumnDetail('Local keys discovered', (string) $localKeyCount);
-		$this->components->twoColumnDetail('Remote keys', (string) $remoteKeyCount);
+		$this->components->info('Translation key summary:');
+		$this->components->twoColumnDetail('Local Translation Keys', (string) $localKeyCount);
+		$this->components->twoColumnDetail('Linguist Project Translation Keys', $remoteKeyCount === null ? 'N/A' : (string) $remoteKeyCount);
 		$this->newLine();
 	}
 

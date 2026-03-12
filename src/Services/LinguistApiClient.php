@@ -174,28 +174,106 @@ final class LinguistApiClient
 
 	/**
 	 * Count all remote translation keys for the current project.
+	 *
+	 * @throws \RuntimeException
 	 */
 	public function countTranslationKeys(): int
 	{
 		$response = $this->listTranslationKeys(['per_page' => 1, 'page' => 1]);
 
-		if (! $response->successful()) {
+		if ($response->successful()) {
+			foreach ([
+				'meta.total',
+				'pagination.total',
+				'meta.pagination.total',
+				'meta.total_count',
+				'total',
+			] as $path) {
+				$total = $response->json($path);
+				if (is_numeric($total)) {
+					return (int) $total;
+				}
+			}
+
+			foreach (['x-total-count', 'x-pagination-total', 'x-pagination-total-count'] as $header) {
+				$total = $response->header($header);
+				if (is_numeric($total)) {
+					return (int) $total;
+				}
+			}
+
+			foreach (['data', 'translation_keys', 'items'] as $path) {
+				$list = $response->json($path, null);
+				if (is_array($list)) {
+					return count($list);
+				}
+			}
+		}
+
+		$fallbackCount = $this->countTranslationKeysFromExports();
+
+		if ($fallbackCount !== null) {
+			return $fallbackCount;
+		}
+
+		throw new \RuntimeException('Failed to fetch translation keys count.');
+	}
+
+	private function countTranslationKeysFromExports(): ?int
+	{
+		$languagesResponse = $this->getLanguages();
+
+		if (! $languagesResponse->successful()) {
+			return null;
+		}
+
+		$languages = $languagesResponse->json('data', []);
+
+		if (! is_array($languages) || $languages === []) {
 			return 0;
 		}
 
-		$metaTotal = $response->json('meta.total');
-		if (is_int($metaTotal)) {
-			return $metaTotal;
+		foreach ($languages as $language) {
+			$languageCode = strtoupper((string) $language);
+			if ($languageCode === '') {
+				continue;
+			}
+
+			$exportRouteResponse = $this->getExportUrl($languageCode);
+			if (! $exportRouteResponse->successful()) {
+				continue;
+			}
+
+			$exportUrl = (string) $exportRouteResponse->json('url', '');
+			if ($exportUrl === '') {
+				continue;
+			}
+
+			$exportResponse = $this->downloadExport($exportUrl);
+			if (! $exportResponse->successful()) {
+				continue;
+			}
+
+			$decoded = json_decode($exportResponse->body(), true);
+			if (! is_array($decoded)) {
+				continue;
+			}
+
+			return $this->countTranslationLeafs($decoded);
 		}
 
-		$paginationTotal = $response->json('pagination.total');
-		if (is_int($paginationTotal)) {
-			return $paginationTotal;
-		}
+		return null;
+	}
 
-		$data = $response->json('data', []);
+	private function countTranslationLeafs(array $translations): int
+	{
+		$count = 0;
 
-		return is_array($data) ? count($data) : 0;
+		array_walk_recursive($translations, static function () use (&$count): void {
+			$count++;
+		});
+
+		return $count;
 	}
 
 	/**

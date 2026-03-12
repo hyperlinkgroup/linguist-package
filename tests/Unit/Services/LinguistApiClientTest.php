@@ -1,0 +1,90 @@
+<?php
+
+use Hyperlinkgroup\Linguist\Services\LinguistApiClient;
+use Illuminate\Support\Facades\Http;
+
+test('count translation keys reads numeric totals from nested metadata', function () {
+	Http::preventStrayRequests();
+	Http::fake([
+		'https://api.linguist.eu/projects/test-project/translation-keys?per_page=1&page=1' => Http::response([
+			'meta' => [
+				'pagination' => [
+					'total' => '758',
+				],
+			],
+		], 200),
+	]);
+
+	$client = new LinguistApiClient(
+		baseUrl: 'https://api.linguist.eu',
+		token: 'test-token',
+		projectSlug: 'test-project',
+	);
+
+	expect($client->countTranslationKeys())->toBe(758);
+});
+
+test('count translation keys reads totals from pagination headers', function () {
+	Http::preventStrayRequests();
+	Http::fake([
+		'https://api.linguist.eu/projects/test-project/translation-keys?per_page=1&page=1' => Http::response([
+			'data' => [['id' => 1]],
+		], 200, [
+			'X-Total-Count' => '1514',
+		]),
+	]);
+
+	$client = new LinguistApiClient(
+		baseUrl: 'https://api.linguist.eu',
+		token: 'test-token',
+		projectSlug: 'test-project',
+	);
+
+	expect($client->countTranslationKeys())->toBe(1514);
+});
+
+test('count translation keys throws when request fails', function () {
+	Http::preventStrayRequests();
+	Http::fake([
+		'https://api.linguist.eu/projects/test-project/translation-keys?per_page=1&page=1' => Http::response([], 403),
+		'https://api.linguist.eu/projects/test-project/languages' => Http::response([], 403),
+	]);
+
+	$client = new LinguistApiClient(
+		baseUrl: 'https://api.linguist.eu',
+		token: 'test-token',
+		projectSlug: 'test-project',
+	);
+
+	$client->countTranslationKeys();
+})->throws(RuntimeException::class);
+
+test('count translation keys falls back to export payload when list endpoint fails', function () {
+	Http::preventStrayRequests();
+	Http::fake([
+		'https://api.linguist.eu/projects/test-project/translation-keys?per_page=1&page=1' => Http::response([], 403),
+		'https://api.linguist.eu/projects/test-project/languages' => Http::response([
+			'data' => ['EN', 'DE'],
+		], 200),
+		'https://api.linguist.eu/projects/test-project/export/json/EN?prefix=:' => Http::response([
+			'url' => 'https://api.linguist.eu/export/en',
+		], 200),
+		'https://api.linguist.eu/export/en' => Http::response([
+			'auth' => [
+				'login' => 'Login',
+				'logout' => 'Logout',
+			],
+			'common' => [
+				'ok' => 'Ok',
+			],
+		], 200),
+	]);
+
+	$client = new LinguistApiClient(
+		baseUrl: 'https://api.linguist.eu',
+		token: 'test-token',
+		projectSlug: 'test-project',
+	);
+
+	expect($client->countTranslationKeys())->toBe(3);
+});

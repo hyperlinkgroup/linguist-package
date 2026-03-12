@@ -264,7 +264,7 @@ final class LinguistSetupCommand extends Command
 			->unique()
 			->count();
 
-		$remoteKeyCount = 0;
+		$remoteKeyCount = null;
 
 		if (($projectChoice['type'] ?? '') === 'existing' && isset($projectChoice['slug'])) {
 			try {
@@ -275,13 +275,13 @@ final class LinguistSetupCommand extends Command
 				);
 				$remoteKeyCount = $client->countTranslationKeys();
 			} catch (\Throwable) {
-				$remoteKeyCount = 0;
+				$remoteKeyCount = null;
 			}
 		}
 
-		$this->components->info('Key discovery summary');
+		$this->components->info('Translation key summary');
 		$this->components->twoColumnDetail('Local keys discovered', (string) $localKeyCount);
-		$this->components->twoColumnDetail('Remote keys', (string) $remoteKeyCount);
+		$this->components->twoColumnDetail('Remote keys', $remoteKeyCount === null ? 'N/A' : (string) $remoteKeyCount);
 		$this->newLine();
 	}
 
