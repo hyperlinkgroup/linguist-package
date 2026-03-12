@@ -26,7 +26,7 @@ test('action collects translations from local directories', function () {
 	], JSON_PRETTY_PRINT));
 
 	$action = new CollectLocalTranslations();
-	$translations = $action->handle('test-project');
+	$translations = $action->handle();
 
 	expect($translations)->toHaveKeys(['EN', 'DE'])
 		->and($translations['EN'])->toHaveKeys(['managed', 'goodbye'])
@@ -46,6 +46,46 @@ test('action detects available languages', function () {
 	expect($languages)->toHaveCount(2)
 		->and($languages)->toContain('EN')
 		->and($languages)->toContain('DE');
+});
+
+test('action resolves language from directory for nested project files', function () {
+	File::ensureDirectoryExists(lang_path('EN'));
+
+	File::put(lang_path('EN/project.json'), json_encode([
+		'nested' => 'From project file',
+	], JSON_PRETTY_PRINT));
+
+	$action = new CollectLocalTranslations();
+	$allTranslations = $action->handle('project');
+	$english = $action->getTranslationsForLanguage('EN', 'project');
+
+	expect($allTranslations)->toHaveKey('EN')
+		->and($allTranslations)->not->toHaveKey('PROJECT')
+		->and($allTranslations['EN'])->toHaveKey('nested')
+		->and($english)->toHaveKey('nested')
+		->and($english['nested'])->toBe('From project file');
+});
+
+test('action filters non-managed files by project slug when provided', function () {
+	File::ensureDirectoryExists(lang_path('EN'));
+
+	File::put(lang_path('EN/project-a.json'), json_encode([
+		'a.only' => 'A value',
+	], JSON_PRETTY_PRINT));
+	File::put(lang_path('EN/project-b.json'), json_encode([
+		'b.only' => 'B value',
+	], JSON_PRETTY_PRINT));
+	File::put(lang_path('EN/linguist.json'), json_encode([
+		'managed' => 'Managed EN',
+	], JSON_PRETTY_PRINT));
+
+	$action = new CollectLocalTranslations();
+	$translations = $action->handle('project-a');
+
+	expect($translations)->toHaveKey('EN')
+		->and($translations['EN'])->toHaveKey('a.only')
+		->and($translations['EN'])->toHaveKey('managed')
+		->and($translations['EN'])->not->toHaveKey('b.only');
 });
 
 test('action parses nested translation files', function () {
@@ -117,7 +157,7 @@ test('linguist managed keys override non linguist keys on collision', function (
 	], JSON_PRETTY_PRINT));
 
 	$action = new CollectLocalTranslations();
-	$translations = $action->handle('test-project');
+	$translations = $action->handle();
 	$english = $action->getTranslationsForLanguage('EN', 'test-project');
 
 	expect($translations['EN']['hello'])->toBe('Hello from linguist')

@@ -90,8 +90,10 @@ function createTestTranslationFiles(string $project, array $languages = ['EN', '
 	File::ensureDirectoryExists(lang_path());
 
 	foreach ($languages as $language) {
+		File::ensureDirectoryExists(lang_path(strtoupper($language)));
+
 		File::put(
-			lang_path(strtolower($language) . '.json'),
+			lang_path(strtoupper($language) . "/{$project}.json"),
 			json_encode([
 				'hello' => "Hello in {$language}",
 				'goodbye' => "Goodbye in {$language}",
