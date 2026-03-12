@@ -118,16 +118,18 @@ php artisan linguist:sync --push --overwrite
 php artisan linguist:sync --push --languages=EN,DE
 ```
 
-`--prune-remote-keys`, `--no-activate-missing-languages`, and `--overwrite` are currently accepted flags but are not yet applied by the sync/push action internals.
+`--prune-remote-keys` now deletes remote keys that no longer exist locally before upload.
+`--no-activate-missing-languages` now skips uploading local languages that are not active in the remote project.
+If missing-language activation is enabled (default), sync attempts to activate them before upload when resolvable from project metadata.
 
 ## Sync Modes
 
 ### Sync Mode (Recommended)
 
-Performs a two-way merge between local and remote translations:
+Performs a two-phase sync:
 
-- Downloads remote translations
-- Merges with local translations (remote values take precedence for conflicts)
+- Uploads local keys first (`push`)
+- Downloads the resulting remote state (`pull`) into local files
 
 ### Pull Mode
 
