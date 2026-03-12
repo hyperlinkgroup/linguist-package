@@ -12,7 +12,7 @@ final class PushTranslations
 {
 	use AsAction;
 
-	private const BATCH_SIZE = 100;
+	private const BATCH_SIZE = 250;
 
 	public function __construct(
 		private readonly LinguistApiClient $apiClient,
@@ -101,29 +101,21 @@ final class PushTranslations
 
 						continue;
 					}
+
+					$errors[] = sprintf(
+						'Batch upload failed (status %d). Response: %s',
+						$response->status(),
+						substr($response->body(), 0, 300)
+					);
 				} catch (\Exception $e) {
-					// Fall back to key-level calls so we can isolate failures.
+					$errors[] = 'Batch upload threw exception. ' . $e->getMessage();
 				}
 
 				foreach ($batch as $key => $translationsForKey) {
-					try {
-						$response = $this->apiClient->storeTranslationKey((string) $key, $translationsForKey);
+					$keysFailed += count($translationsForKey);
 
-						if (! $response->successful()) {
-							$keysFailed += count($translationsForKey);
-
-							foreach (array_unique($keyLanguages[(string) $key] ?? []) as $language) {
-								$languageErrors[$language][] = "Failed to store key '{$key}'";
-							}
-						} else {
-							$keysProcessed += count($translationsForKey);
-						}
-					} catch (\Exception $e) {
-						$keysFailed += count($translationsForKey);
-
-						foreach (array_unique($keyLanguages[(string) $key] ?? []) as $language) {
-							$languageErrors[$language][] = "Error storing key '{$key}': " . $e->getMessage();
-						}
+					foreach (array_unique($keyLanguages[(string) $key] ?? []) as $language) {
+						$languageErrors[$language][] = "Failed to store key '{$key}' in batch upload.";
 					}
 
 					$currentKey++;

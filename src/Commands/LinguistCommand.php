@@ -60,11 +60,7 @@ class LinguistCommand extends Command
 			$syncResult = match ($selectedMode) {
 				'pull' => $pullTranslations->handle($projectSlug),
 				'push' => $this->runPushWithProgress($pushTranslations, $projectSlug),
-				'sync' => $syncTranslations->handle(
-					projectSlug: $projectSlug,
-					pruneRemoteKeys: (bool) $this->option('prune-remote-keys'),
-					activateMissingLanguages: ! (bool) $this->option('no-activate-missing-languages')
-				),
+				'sync' => $this->runSyncWithProgress($syncTranslations, $projectSlug),
 			};
 
 			$this->newLine();
@@ -110,6 +106,33 @@ class LinguistCommand extends Command
 			overwrite: (bool) $this->option('overwrite'),
 			specificLanguages: $this->parseLanguagesOption(),
 			onProgress: function (int $current, int $total, string $key) use (&$uploadProgress): void {
+				if ($uploadProgress === null) {
+					$uploadProgress = progress(
+						label: 'Uploading translation keys',
+						steps: $total,
+					);
+					$uploadProgress->start();
+				}
+
+				$uploadProgress->hint("Key: {$key}");
+				$uploadProgress->advance();
+
+				if ($current >= $total) {
+					$uploadProgress->finish();
+				}
+			}
+		);
+	}
+
+	private function runSyncWithProgress(SyncTranslations $syncTranslations, string $projectSlug): SyncResult
+	{
+		$uploadProgress = null;
+
+		return $syncTranslations->handle(
+			projectSlug: $projectSlug,
+			pruneRemoteKeys: (bool) $this->option('prune-remote-keys'),
+			activateMissingLanguages: ! (bool) $this->option('no-activate-missing-languages'),
+			onPushProgress: function (int $current, int $total, string $key) use (&$uploadProgress): void {
 				if ($uploadProgress === null) {
 					$uploadProgress = progress(
 						label: 'Uploading translation keys',
