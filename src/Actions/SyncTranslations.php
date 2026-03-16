@@ -97,7 +97,7 @@ final class SyncTranslations
 			$pullLanguageResult = $pullResult->languageResults[$language] ?? ['success' => true];
 
 			$result = [
-				'success' => ($pushLanguageResult['success'] ?? true) && ($pullLanguageResult['success'] ?? true),
+				'success' => $pushLanguageResult['success'] && $pullLanguageResult['success'],
 			];
 
 			$message = collect([
