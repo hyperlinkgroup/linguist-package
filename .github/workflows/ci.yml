@@ -84,4 +84,4 @@ jobs:
         uses: ramsey/composer-install@v2
 
       - name: Run Pint in check mode
-        run: ./vendor/bin/pint --test
+        run: ./vendor/bin/pint
