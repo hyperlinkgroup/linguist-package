@@ -32,7 +32,7 @@ class LinguistServiceProvider extends PackageServiceProvider
 
 		// Register legacy Linguist class
 		$this->app->singleton(Linguist::class, function () {
-			return new Linguist();
+			return new Linguist;
 		});
 
 		// Register API Client

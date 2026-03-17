@@ -16,8 +16,7 @@ final class SetupOrchestrator
 {
 	public function __construct(
 		private readonly LinguistApiClient $apiClient,
-	) {
-	}
+	) {}
 
 	/**
 	 * Execute the full setup flow.

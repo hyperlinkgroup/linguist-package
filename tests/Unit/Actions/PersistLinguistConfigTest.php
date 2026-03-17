@@ -11,7 +11,7 @@ afterEach(function () {
 });
 
 test('action persists config values to env file', function () {
-	$action = new PersistLinguistConfig();
+	$action = new PersistLinguistConfig;
 
 	$results = $action->handle([
 		'token' => 'test-token-123',
@@ -29,7 +29,7 @@ test('action persists config values to env file', function () {
 });
 
 test('action escapes values with special characters', function () {
-	$action = new PersistLinguistConfig();
+	$action = new PersistLinguistConfig;
 
 	$action->handle([
 		'token' => 'token with spaces and #hash',
@@ -40,7 +40,7 @@ test('action escapes values with special characters', function () {
 });
 
 test('action updates existing values', function () {
-	$action = new PersistLinguistConfig();
+	$action = new PersistLinguistConfig;
 
 	// First write
 	$action->handle(['token' => 'first-token']);
@@ -54,7 +54,7 @@ test('action updates existing values', function () {
 });
 
 test('action masks token for display', function () {
-	$action = new PersistLinguistConfig();
+	$action = new PersistLinguistConfig;
 	config(['linguist.token' => 'test-token-1234']);
 
 	$masked = $action->getConfigSummary();
@@ -63,7 +63,7 @@ test('action masks token for display', function () {
 });
 
 test('action can be run as an invokable', function () {
-	$action = new PersistLinguistConfig();
+	$action = new PersistLinguistConfig;
 
 	$results = $action(['token' => 'invokable-token']);
 

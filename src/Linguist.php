@@ -84,7 +84,7 @@ class Linguist
 		$this->languages = collect($response->json('data'));
 
 		if ($this->languages->isEmpty()) {
-			throw new NoLanguageActivatedException();
+			throw new NoLanguageActivatedException;
 		}
 	}
 

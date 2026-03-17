@@ -25,7 +25,7 @@ test('action collects translations from local directories', function () {
 		'goodbye' => 'Bye from spark',
 	], JSON_PRETTY_PRINT));
 
-	$action = new CollectLocalTranslations();
+	$action = new CollectLocalTranslations;
 	$translations = $action->handle();
 
 	expect($translations)->toHaveKeys(['EN', 'DE'])
@@ -40,7 +40,7 @@ test('action detects available languages', function () {
 	File::put(lang_path('EN/linguist.json'), json_encode(['managed' => 'Managed EN'], JSON_PRETTY_PRINT));
 	File::put(lang_path('spark/de.json'), json_encode(['hello' => 'Hallo'], JSON_PRETTY_PRINT));
 
-	$action = new CollectLocalTranslations();
+	$action = new CollectLocalTranslations;
 	$languages = $action->detectLanguages();
 
 	expect($languages)->toHaveCount(2)
@@ -55,7 +55,7 @@ test('action resolves language from directory for nested project files', functio
 		'nested' => 'From project file',
 	], JSON_PRETTY_PRINT));
 
-	$action = new CollectLocalTranslations();
+	$action = new CollectLocalTranslations;
 	$allTranslations = $action->handle('project');
 	$english = $action->getTranslationsForLanguage('EN', 'project');
 
@@ -79,7 +79,7 @@ test('action filters non-managed files by project slug when provided', function 
 		'managed' => 'Managed EN',
 	], JSON_PRETTY_PRINT));
 
-	$action = new CollectLocalTranslations();
+	$action = new CollectLocalTranslations;
 	$translations = $action->handle('project-a');
 
 	expect($translations)->toHaveKey('EN')
@@ -103,7 +103,7 @@ test('action parses nested translation files', function () {
 		], JSON_PRETTY_PRINT)
 	);
 
-	$action = new CollectLocalTranslations();
+	$action = new CollectLocalTranslations;
 	$translations = $action->getTranslationsForLanguage('EN');
 
 	expect($translations)->toHaveKey('user.profile.title')
@@ -112,7 +112,7 @@ test('action parses nested translation files', function () {
 });
 
 test('action writes translations to file', function () {
-	$action = new CollectLocalTranslations();
+	$action = new CollectLocalTranslations;
 
 	$translations = [
 		'hello' => 'Hello World',
@@ -134,7 +134,7 @@ test('action writes translations to file', function () {
 });
 
 test('action returns empty array for non-existent language', function () {
-	$action = new CollectLocalTranslations();
+	$action = new CollectLocalTranslations;
 	$translations = $action->getTranslationsForLanguage('XX', 'nonexistent');
 
 	expect($translations)->toBe([]);
@@ -156,7 +156,7 @@ test('linguist managed keys override non linguist keys on collision', function (
 		'hello' => 'Hello from linguist',
 	], JSON_PRETTY_PRINT));
 
-	$action = new CollectLocalTranslations();
+	$action = new CollectLocalTranslations;
 	$translations = $action->handle();
 	$english = $action->getTranslationsForLanguage('EN', 'test-project');
 
@@ -167,7 +167,7 @@ test('linguist managed keys override non linguist keys on collision', function (
 test('action can be run as an invokable', function () {
 	createTestTranslationFiles('test-project', ['EN']);
 
-	$action = new CollectLocalTranslations();
+	$action = new CollectLocalTranslations;
 	$translations = $action('test-project');
 
 	expect($translations)->toHaveKey('EN');

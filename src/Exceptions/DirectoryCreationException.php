@@ -4,6 +4,4 @@ namespace Hyperlinkgroup\Linguist\Exceptions;
 
 use Exception;
 
-class DirectoryCreationException extends Exception
-{
-}
+class DirectoryCreationException extends Exception {}

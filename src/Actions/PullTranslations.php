@@ -18,8 +18,7 @@ final class PullTranslations
 	public function __construct(
 		private readonly LinguistApiClient $apiClient,
 		private readonly string $temporaryDirectory = 'tmp/translations',
-	) {
-	}
+	) {}
 
 	/**
 	 * Pull translations from Linguist and overwrite local files.
@@ -43,7 +42,7 @@ final class PullTranslations
 			$languages = collect($languagesResponse->json('data', []));
 
 			if ($languages->isEmpty()) {
-				throw new NoLanguageActivatedException();
+				throw new NoLanguageActivatedException;
 			}
 
 			File::ensureDirectoryExists(storage_path($this->temporaryDirectory));
