@@ -73,6 +73,8 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        env:
+          GITHUB_TOKEN: ${{ secrets.SECRET_GITHUB_ACTION_TOKEN }}
 
       - name: Setup PHP
         uses: shivammathur/setup-php@v2
@@ -85,3 +87,9 @@ jobs:
 
       - name: Run Pint in check mode
         run: ./vendor/bin/pint
+
+      - name: Commit changes
+        uses: stefanzweifel/git-auto-commit-action@v4
+        with:
+          commit_message: 'chore(Pint): Code formatting'
+          skip_fetch: true
