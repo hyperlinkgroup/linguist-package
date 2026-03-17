@@ -73,6 +73,9 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+          ref: ${{ github.head_ref }}
         env:
           GITHUB_TOKEN: ${{ secrets.SECRET_GITHUB_ACTION_TOKEN }}
 
