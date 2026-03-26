@@ -16,8 +16,7 @@ final class SyncResult
 		public readonly array $errors = [],
 		public readonly int $keysProcessed = 0,
 		public readonly int $keysFailed = 0,
-	) {
-	}
+	) {}
 
 	public function hasPartialSuccess(): bool
 	{

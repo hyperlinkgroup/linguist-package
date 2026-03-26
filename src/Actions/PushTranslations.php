@@ -16,8 +16,7 @@ final class PushTranslations
 
 	public function __construct(
 		private readonly LinguistApiClient $apiClient,
-	) {
-	}
+	) {}
 
 	/**
 	 * Push local translations to Linguist.

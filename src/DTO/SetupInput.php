@@ -16,8 +16,7 @@ final class SetupInput
 		public readonly bool $triggerAutoTranslate = false,
 		public readonly ?int $sourceLanguageId = null,
 		public readonly array $targetLanguageIds = [],
-	) {
-	}
+	) {}
 
 	public function isNewProject(): bool
 	{
