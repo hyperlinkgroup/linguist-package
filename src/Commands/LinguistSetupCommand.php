@@ -60,7 +60,7 @@ final class LinguistSetupCommand extends Command
 		$isTokenValid = $this->orchestrator->validateApiToken($apiToken);
 
 		if (! $isTokenValid) {
-			$this->error('Invalid API token. Please check your token and try again.');
+			$this->components->error('Invalid API token. Please check your token and try again.');
 
 			return SymfonyCommand::FAILURE;
 		}
