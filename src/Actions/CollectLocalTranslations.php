@@ -240,5 +240,4 @@ final class CollectLocalTranslations
 
 		return $result;
 	}
-
 }

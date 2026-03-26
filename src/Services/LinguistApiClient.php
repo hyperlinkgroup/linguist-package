@@ -268,7 +268,6 @@ final class LinguistApiClient
 	}
 
 	/**
-	 * @param  mixed  $languagesPayload
 	 * @return array<string>
 	 */
 	public function extractLanguageCodes(mixed $languagesPayload): array
