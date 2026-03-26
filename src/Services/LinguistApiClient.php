@@ -91,10 +91,10 @@ final class LinguistApiClient
 	/**
 	 * Get export URL for a specific language.
 	 */
-	public function getExportUrl(string $language): Response
+	public function getExportUrl(string $language, array $query = ['prefix' => ':']): Response
 	{
 		return $this->getHttp()
-			->get($this->projectUrl('export/json/' . strtoupper($language)) . '?prefix=:');
+			->get($this->projectUrl('export/json/' . strtoupper($language)), $query);
 	}
 
 	/**
@@ -233,36 +233,168 @@ final class LinguistApiClient
 			return 0;
 		}
 
-		foreach ($languages as $language) {
-			$languageCode = strtoupper((string) $language);
-			if ($languageCode === '') {
-				continue;
-			}
+		foreach ($this->extractLanguageCodes($languages) as $languageCode) {
+			$count = $this->countLanguageExportLeafsWithPrefixFallback($languageCode);
 
-			$exportRouteResponse = $this->getExportUrl($languageCode);
-			if (! $exportRouteResponse->successful()) {
-				continue;
+			if ($count !== null) {
+				return $count;
 			}
-
-			$exportUrl = (string) $exportRouteResponse->json('url', '');
-			if ($exportUrl === '') {
-				continue;
-			}
-
-			$exportResponse = $this->downloadExport($exportUrl);
-			if (! $exportResponse->successful()) {
-				continue;
-			}
-
-			$decoded = json_decode($exportResponse->body(), true);
-			if (! is_array($decoded)) {
-				continue;
-			}
-
-			return $this->countTranslationLeafs($decoded);
 		}
 
 		return null;
+	}
+
+	private function countLanguageExportLeafsWithPrefixFallback(string $languageCode): ?int
+	{
+		$preferredExport = $this->downloadLanguageExport($languageCode, ['prefix' => ':']);
+		$preferredCount = $preferredExport['success'] ? $preferredExport['key_count'] : 0;
+
+		if ($preferredCount > 0) {
+			return $preferredCount;
+		}
+
+		$fallbackExport = $this->downloadLanguageExport($languageCode, []);
+		if (! $fallbackExport['success']) {
+			if (! $preferredExport['success']) {
+				return null;
+			}
+
+			return $preferredCount;
+		}
+
+		$fallbackCount = $fallbackExport['key_count'];
+
+		return max($preferredCount, $fallbackCount);
+	}
+
+	/**
+	 * @param  mixed  $languagesPayload
+	 * @return array<string>
+	 */
+	public function extractLanguageCodes(mixed $languagesPayload): array
+	{
+		if (! is_array($languagesPayload)) {
+			return [];
+		}
+
+		return collect($languagesPayload)
+			->map(static function (mixed $language): string {
+				if (is_string($language)) {
+					return strtoupper($language);
+				}
+
+				if (is_array($language)) {
+					$code = $language['code'] ?? $language['locale'] ?? '';
+
+					return strtoupper((string) $code);
+				}
+
+				return '';
+			})
+			->filter(static fn (string $code): bool => $code !== '')
+			->unique()
+			->values()
+			->all();
+	}
+
+	/**
+	 * Download translation payload for a language.
+	 *
+	 * Prefer exports with `prefix=:` (key formatting hint used by Linguist), then retry
+	 * without a prefix when the prefixed variant returns no keys.
+	 *
+	 * @return array{success: bool, key_count: int, body?: string, message?: string}
+	 */
+	public function downloadLanguageExportWithPrefixFallback(string $languageCode): array
+	{
+		$attemptQueries = [
+			['prefix' => ':'],
+			[],
+		];
+
+		$hasSuccessfulDownload = false;
+		$failureMessages = [];
+
+		foreach ($attemptQueries as $query) {
+			$exportDownload = $this->downloadLanguageExport($languageCode, $query);
+
+			if ($exportDownload['success']) {
+				$hasSuccessfulDownload = true;
+
+				if ($exportDownload['key_count'] > 0) {
+					return $exportDownload;
+				}
+
+				continue;
+			}
+
+			$failureMessage = $exportDownload['message'] ?? null;
+
+			if (is_string($failureMessage) && $failureMessage !== '') {
+				$failureMessages[] = $failureMessage;
+			}
+		}
+
+		if ($hasSuccessfulDownload) {
+			return [
+				'success' => false,
+				'key_count' => 0,
+				'message' => 'Downloaded export payload is empty.',
+			];
+		}
+
+		$uniqueFailureMessages = array_values(array_unique($failureMessages));
+
+		return [
+			'success' => false,
+			'key_count' => 0,
+			'message' => $uniqueFailureMessages !== [] ? implode('; ', $uniqueFailureMessages) : 'Failed to download export file.',
+		];
+	}
+
+	/**
+	 * @param  array<string, string>  $query
+	 * @return array{success: bool, key_count: int, body?: string, message?: string}
+	 */
+	private function downloadLanguageExport(string $languageCode, array $query): array
+	{
+		$exportRouteResponse = $this->getExportUrl($languageCode, $query);
+
+		if (! $exportRouteResponse->successful()) {
+			return [
+				'success' => false,
+				'key_count' => 0,
+				'message' => 'Failed to fetch export URL for this language.',
+			];
+		}
+
+		$exportUrl = (string) $exportRouteResponse->json('url', '');
+		if ($exportUrl === '') {
+			return [
+				'success' => false,
+				'key_count' => 0,
+				'message' => 'Export URL is missing from response.',
+			];
+		}
+
+		$exportResponse = $this->downloadExport($exportUrl);
+		if (! $exportResponse->successful()) {
+			return [
+				'success' => false,
+				'key_count' => 0,
+				'message' => 'Failed to download export file.',
+			];
+		}
+
+		$body = $exportResponse->body();
+		$decoded = json_decode($body, true);
+		$keyCount = is_array($decoded) ? $this->countTranslationLeafs($decoded) : 0;
+
+		return [
+			'success' => true,
+			'key_count' => $keyCount,
+			'body' => $body,
+		];
 	}
 
 	private function countTranslationLeafs(array $translations): int
