@@ -3,10 +3,22 @@
 use Hyperlinkgroup\Linguist\Actions\PushTranslations;
 use Hyperlinkgroup\Linguist\Services\LinguistApiClient;
 use Illuminate\Http\Client\Request;
+use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Http;
+
+beforeEach(function () {
+	$this->pushTranslationsPreviousLangPath = $this->app->langPath();
+	$isolatedLangPath = storage_path('linguist-push-translations-' . uniqid('', true));
+	File::ensureDirectoryExists($isolatedLangPath);
+	$this->app->useLangPath($isolatedLangPath);
+});
 
 afterEach(function () {
 	cleanTranslationFiles();
+	if (isset($this->pushTranslationsPreviousLangPath)) {
+		$this->app->useLangPath($this->pushTranslationsPreviousLangPath);
+		unset($this->pushTranslationsPreviousLangPath);
+	}
 });
 
 test('push sends one request per unique key with merged language payload', function () {
