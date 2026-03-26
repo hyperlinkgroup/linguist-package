@@ -277,6 +277,59 @@ final class LinguistApiClient
 	}
 
 	/**
+	 * Fetch a single project (full detail; list responses may omit nested languages).
+	 */
+	public function getProject(): Response
+	{
+		return $this->getHttp()
+			->get($this->projectUrl());
+	}
+
+	/**
+	 * Build code => id map from project JSON (list or show payload).
+	 *
+	 * @param  array<string, mixed>  $project
+	 * @return array<string, int>
+	 */
+	private function languageIdMapFromProjectPayload(array $project): array
+	{
+		$map = [];
+
+		foreach (['languages', 'available_languages', 'all_languages'] as $key) {
+			$languages = $project[$key] ?? null;
+			if (! is_array($languages)) {
+				continue;
+			}
+
+			foreach ($languages as $language) {
+				if (! is_array($language)) {
+					continue;
+				}
+
+				$code = strtoupper((string) ($language['code'] ?? ''));
+				$id = $language['id'] ?? null;
+
+				if ($code !== '' && is_numeric($id)) {
+					$map[$code] = (int) $id;
+				}
+			}
+		}
+
+		$sourceLanguage = $project['language'] ?? null;
+
+		if (is_array($sourceLanguage)) {
+			$sourceCode = strtoupper((string) ($sourceLanguage['code'] ?? ''));
+			$sourceId = $sourceLanguage['id'] ?? ($project['language_id'] ?? null);
+
+			if ($sourceCode !== '' && is_numeric($sourceId)) {
+				$map[$sourceCode] = (int) $sourceId;
+			}
+		}
+
+		return $map;
+	}
+
+	/**
 	 * Resolve project language codes to language IDs.
 	 *
 	 * @return array<string, int>
@@ -291,28 +344,45 @@ final class LinguistApiClient
 				->first(fn (array $candidate): bool => ($candidate['slug'] ?? null) === $this->projectSlug);
 
 			if (is_array($project)) {
-				$languages = $project['languages'] ?? [];
+				$map = $this->languageIdMapFromProjectPayload($project);
+			}
+		}
 
-				if (is_array($languages)) {
-					foreach ($languages as $language) {
-						$code = strtoupper((string) ($language['code'] ?? ''));
-						$id = $language['id'] ?? null;
+		if ($map !== []) {
+			return $map;
+		}
 
-						if ($code !== '' && is_numeric($id)) {
-							$map[$code] = (int) $id;
-						}
-					}
+		$projectResponse = $this->getProject();
+
+		if ($projectResponse->successful()) {
+			$project = $projectResponse->json('data');
+
+			if (! is_array($project)) {
+				$project = $projectResponse->json();
+			}
+
+			if (is_array($project)) {
+				$map = $this->languageIdMapFromProjectPayload($project);
+			}
+		}
+
+		if ($map !== []) {
+			return $map;
+		}
+
+		$languagesResponse = $this->getLanguages();
+
+		if ($languagesResponse->successful()) {
+			foreach ($languagesResponse->json('data', []) as $item) {
+				if (! is_array($item)) {
+					continue;
 				}
 
-				$sourceLanguage = $project['language'] ?? null;
+				$code = strtoupper((string) ($item['code'] ?? ''));
+				$id = $item['id'] ?? null;
 
-				if (is_array($sourceLanguage)) {
-					$sourceCode = strtoupper((string) ($sourceLanguage['code'] ?? ''));
-					$sourceId = $sourceLanguage['id'] ?? ($project['language_id'] ?? null);
-
-					if ($sourceCode !== '' && is_numeric($sourceId)) {
-						$map[$sourceCode] = (int) $sourceId;
-					}
+				if ($code !== '' && is_numeric($id)) {
+					$map[$code] = (int) $id;
 				}
 			}
 		}

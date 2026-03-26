@@ -88,3 +88,88 @@ test('count translation keys falls back to export payload when list endpoint fai
 
 	expect($client->countTranslationKeys())->toBe(3);
 });
+
+test('get project language id map falls back to single project when list omits languages', function () {
+	Http::preventStrayRequests();
+	Http::fake([
+		'https://api.linguist.eu/projects?per_page=100' => Http::response([
+			'data' => [[
+				'slug' => 'test-project',
+				'name' => 'Test',
+			]],
+		], 200),
+		'https://api.linguist.eu/projects/test-project' => Http::response([
+			'data' => [
+				'slug' => 'test-project',
+				'languages' => [
+					['id' => 10, 'code' => 'EN'],
+					['id' => 20, 'code' => 'DE'],
+				],
+			],
+		], 200),
+	]);
+
+	$client = new LinguistApiClient(
+		baseUrl: 'https://api.linguist.eu',
+		token: 'test-token',
+		projectSlug: 'test-project',
+	);
+
+	expect($client->getProjectLanguageIdMap())->toBe([
+		'EN' => 10,
+		'DE' => 20,
+	]);
+});
+
+test('get project language id map reads available_languages from project payload', function () {
+	Http::preventStrayRequests();
+	Http::fake([
+		'https://api.linguist.eu/projects?per_page=100' => Http::response([
+			'data' => [[
+				'slug' => 'test-project',
+				'available_languages' => [
+					['id' => 7, 'code' => 'fr'],
+				],
+			]],
+		], 200),
+	]);
+
+	$client = new LinguistApiClient(
+		baseUrl: 'https://api.linguist.eu',
+		token: 'test-token',
+		projectSlug: 'test-project',
+	);
+
+	expect($client->getProjectLanguageIdMap())->toBe(['FR' => 7]);
+});
+
+test('get project language id map falls back to languages endpoint with id and code objects', function () {
+	Http::preventStrayRequests();
+	Http::fake([
+		'https://api.linguist.eu/projects?per_page=100' => Http::response([
+			'data' => [[
+				'slug' => 'test-project',
+			]],
+		], 200),
+		'https://api.linguist.eu/projects/test-project' => Http::response([
+			'data' => ['slug' => 'test-project'],
+		], 200),
+		'https://api.linguist.eu/projects/test-project/languages' => Http::response([
+			'data' => [
+				['id' => 1, 'code' => 'EN'],
+				['id' => 2, 'code' => 'DE'],
+			],
+		], 200),
+	]);
+
+	$client = new LinguistApiClient(
+		baseUrl: 'https://api.linguist.eu',
+		token: 'test-token',
+		projectSlug: 'test-project',
+	);
+
+	expect($client->getProjectLanguageIdMap())->toBe([
+		'EN' => 1,
+		'DE' => 2,
+	]);
+});
