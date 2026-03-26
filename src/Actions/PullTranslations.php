@@ -7,7 +7,6 @@ namespace Hyperlinkgroup\Linguist\Actions;
 use Hyperlinkgroup\Linguist\DTO\SyncResult;
 use Hyperlinkgroup\Linguist\Exceptions\NoLanguageActivatedException;
 use Hyperlinkgroup\Linguist\Services\LinguistApiClient;
-use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\File;
 use Lorisleiva\Actions\Concerns\AsAction;
 
@@ -17,7 +16,6 @@ final class PullTranslations
 
 	public function __construct(
 		private readonly LinguistApiClient $apiClient,
-		private readonly string $temporaryDirectory = 'tmp/translations',
 	) {}
 
 	/**
@@ -26,6 +24,7 @@ final class PullTranslations
 	public function handle(string $projectSlug): SyncResult
 	{
 		$languageResults = [];
+		$errors = [];
 
 		try {
 			$this->apiClient->setProjectSlug($projectSlug);
@@ -39,36 +38,41 @@ final class PullTranslations
 				);
 			}
 
-			$languages = collect($languagesResponse->json('data', []));
+			$languages = $this->apiClient->extractLanguageCodes($languagesResponse->json('data', []));
 
-			if ($languages->isEmpty()) {
+			if ($languages === []) {
 				throw new NoLanguageActivatedException;
 			}
 
-			File::ensureDirectoryExists(storage_path($this->temporaryDirectory));
-
-			$exportRoutes = $this->fetchExportRoutes($languages);
-			$downloadedLanguageKeyCounts = $this->downloadFiles($exportRoutes);
+			$keysProcessed = 0;
 
 			foreach ($languages as $language) {
-				if (array_key_exists($language, $downloadedLanguageKeyCounts)) {
+				$result = $this->apiClient->downloadLanguageExportWithPrefixFallback($language);
+
+				if ($result['success']) {
 					$languageResults[$language] = ['success' => true];
+					$keysProcessed += $result['key_count'];
+
+					$body = $result['body'] ?? null;
+					if (is_string($body) && $body !== '') {
+						$this->writeDownloadedTranslations($language, $body);
+					}
 				} else {
+					$message = $result['message'] ?? 'Failed to fetch export URL for this language.';
 					$languageResults[$language] = [
 						'success' => false,
-						'message' => 'Failed to download translations',
+						'message' => $message,
 					];
+					$errors[] = "{$language}: {$message}";
 				}
 			}
 
-			File::deleteDirectory(storage_path($this->temporaryDirectory));
-
 			$successCount = count(array_filter($languageResults, fn ($r) => $r['success']));
-			$keysProcessed = array_sum($downloadedLanguageKeyCounts);
 
 			return new SyncResult(
 				overallSuccess: $successCount === count($languageResults),
 				languageResults: $languageResults,
+				errors: $errors,
 				keysProcessed: $keysProcessed,
 			);
 
@@ -85,62 +89,10 @@ final class PullTranslations
 		}
 	}
 
-	/**
-	 * Fetch export URLs for all languages.
-	 */
-	private function fetchExportRoutes(Collection $languages): array
+	private function writeDownloadedTranslations(string $language, string $body): void
 	{
-		$routes = [];
-
-		$languages->each(function ($language) use (&$routes) {
-			$response = $this->apiClient->getExportUrl($language);
-
-			if ($response->successful()) {
-				$routes[$language] = $response->json('url');
-			}
-		});
-
-		return $routes;
-	}
-
-	/**
-	 * Download translation files to temp storage.
-	 *
-	 * @return array<string, int> Downloaded language codes with processed key count
-	 */
-	private function downloadFiles(array $routes): array
-	{
-		$downloaded = [];
-
-		foreach ($routes as $language => $url) {
-			$response = $this->apiClient->downloadExport($url);
-
-			if ($response->successful()) {
-				$decoded = json_decode($response->body(), true);
-				$keyCount = is_array($decoded) ? $this->countTranslationLeafs($decoded) : 0;
-
-				$tempPath = storage_path($this->temporaryDirectory . "/{$language}.json");
-				File::put($tempPath, $response->body());
-
-				$langDir = lang_path(strtoupper($language));
-				File::ensureDirectoryExists($langDir);
-				File::put("{$langDir}/linguist.json", $response->body());
-
-				$downloaded[$language] = $keyCount;
-			}
-		}
-
-		return $downloaded;
-	}
-
-	private function countTranslationLeafs(array $translations): int
-	{
-		$count = 0;
-
-		array_walk_recursive($translations, static function () use (&$count): void {
-			$count++;
-		});
-
-		return $count;
+		$langDir = lang_path(strtoupper($language));
+		File::ensureDirectoryExists($langDir);
+		File::put("{$langDir}/linguist.json", $body);
 	}
 }

@@ -84,110 +84,111 @@ final class CollectLocalTranslations
 	}
 
 	/**
-	 * Get translations for a specific language.
+	 * Absolute paths scanned for JSON translation files (same logic as discovery).
 	 *
-	 * @return array<string, string>
+	 * @return array<int, string>
 	 */
-	public static function getTranslationsForLanguage(string $language, ?string $projectSlug = null): array
+	public static function translationFileSearchRoots(): array
 	{
-		$translations = [];
-		$discoveredFiles = self::discoverTranslationFiles();
-
-		// Keep precedence consistent with handle(): linguist.json should override collisions.
-		usort($discoveredFiles, function (array $left, array $right): int {
-			if ($left['is_linguist_file'] === $right['is_linguist_file']) {
-				return strcmp($left['path'], $right['path']);
-			}
-
-			return $left['is_linguist_file'] ? 1 : -1;
-		});
-
-		foreach ($discoveredFiles as $discoveredFile) {
-			if ($discoveredFile['language'] !== strtoupper($language)) {
-				continue;
-			}
-
-			if (! self::shouldIncludeForProjectSlug($discoveredFile, $projectSlug)) {
-				continue;
-			}
-
-			$translations = array_merge(
-				$translations,
-				self::parseTranslationFile($discoveredFile['path'])
-			);
-		}
-
-		return $translations;
+		return self::translationFileRoots();
 	}
 
 	/**
-	 * Write translations to a language file.
+	 * Reasons no JSON translation search roots are available.
+	 *
+	 * @return array<int, string>
 	 */
-	public static function writeTranslations(string $language, string $projectSlug, array $translations): bool
+	public static function translationFileSearchRootIssues(): array
 	{
-		$directory = lang_path(strtoupper($language));
-		$path = "{$directory}/" . self::LINGUIST_FILENAME;
+		$roots = self::translationFileRoots();
 
-		if (! File::isDirectory($directory)) {
-			File::makeDirectory($directory, 0755, true);
+		if ($roots !== []) {
+			return [];
 		}
 
-		$nested = self::unflattenTranslations($translations);
-		$json = json_encode($nested, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
+		$configured = lang_path();
+		$configuredPath = is_string($configured) ? $configured : '';
+		$fallback = base_path('lang');
 
-		return File::put($path, $json) !== false;
+		$reasons = [];
+
+		if ($configuredPath === '') {
+			$reasons[] = 'lang_path() is empty';
+		} elseif (! File::isDirectory($configuredPath)) {
+			$reasons[] = "lang_path() is not a directory ({$configuredPath})";
+		}
+
+		if (! File::isDirectory($fallback)) {
+			$reasons[] = "no directory at base_path('lang') ({$fallback})";
+		}
+
+		return $reasons !== [] ? $reasons : ['no searchable directories'];
 	}
 
 	/**
-	 * Discover translatable JSON files recursively from lang_path().
+	 * Roots to scan for JSON translations: Laravel's lang_path() when usable, else project /lang.
+	 *
+	 * @return array<int, string>
+	 */
+	private static function translationFileRoots(): array
+	{
+		$primary = lang_path();
+
+		if (is_string($primary) && $primary !== '' && File::isDirectory($primary)) {
+			return [$primary];
+		}
+
+		$fallback = base_path('lang');
+
+		return File::isDirectory($fallback) ? [$fallback] : [];
+	}
+
+	/**
+	 * Discover translatable JSON files recursively from translation roots.
 	 *
 	 * @return array<int, array{language: string, path: string, filename_without_extension: string, is_linguist_file: bool}>
 	 */
 	private static function discoverTranslationFiles(): array
 	{
-		$langPath = lang_path();
-
-		if (! File::isDirectory($langPath)) {
-			return [];
-		}
-
 		$discovered = [];
 
-		foreach (File::allFiles($langPath) as $file) {
-			if ($file->getExtension() !== 'json') {
-				continue;
+		foreach (self::translationFileRoots() as $langPath) {
+			foreach (File::allFiles($langPath) as $file) {
+				if ($file->getExtension() !== 'json') {
+					continue;
+				}
+
+				$absolutePath = $file->getPathname();
+				$relativePath = ltrim(str_replace($langPath, '', $absolutePath), DIRECTORY_SEPARATOR);
+
+				if ($relativePath === '' || str_starts_with($relativePath, 'vendor' . DIRECTORY_SEPARATOR)) {
+					continue;
+				}
+
+				$filenameWithoutExtension = $file->getFilenameWithoutExtension();
+				$isLinguistFile = strtolower($file->getFilename()) === self::LINGUIST_FILENAME;
+				$pathSegments = explode(DIRECTORY_SEPARATOR, $relativePath);
+				$topLevelSegment = $pathSegments[0] ?? '';
+
+				$language = $isLinguistFile
+					? basename($file->getPath())
+					: (self::isLanguageCodeLike($topLevelSegment) ? $topLevelSegment : $filenameWithoutExtension);
+
+				if ($isLinguistFile && $file->getPath() === $langPath) {
+					continue;
+				}
+
+				if ($language === '' || strtolower($language) === 'vendor') {
+					continue;
+				}
+
+				$discovered[] = [
+					'language' => strtoupper($language),
+					'path' => $absolutePath,
+					'filename_without_extension' => $filenameWithoutExtension,
+					'is_linguist_file' => $isLinguistFile,
+				];
 			}
-
-			$absolutePath = $file->getPathname();
-			$relativePath = ltrim(str_replace($langPath, '', $absolutePath), DIRECTORY_SEPARATOR);
-
-			if ($relativePath === '' || str_starts_with($relativePath, 'vendor' . DIRECTORY_SEPARATOR)) {
-				continue;
-			}
-
-			$filenameWithoutExtension = $file->getFilenameWithoutExtension();
-			$isLinguistFile = strtolower($file->getFilename()) === self::LINGUIST_FILENAME;
-			$pathSegments = explode(DIRECTORY_SEPARATOR, $relativePath);
-			$topLevelSegment = $pathSegments[0] ?? '';
-
-			$language = $isLinguistFile
-				? basename($file->getPath())
-				: (self::isLanguageCodeLike($topLevelSegment) ? $topLevelSegment : $filenameWithoutExtension);
-
-			if ($isLinguistFile && $file->getPath() === $langPath) {
-				continue;
-			}
-
-			if ($language === '' || strtolower($language) === 'vendor') {
-				continue;
-			}
-
-			$discovered[] = [
-				'language' => strtoupper($language),
-				'path' => $absolutePath,
-				'filename_without_extension' => $filenameWithoutExtension,
-				'is_linguist_file' => $isLinguistFile,
-			];
 		}
 
 		return $discovered;
@@ -210,7 +211,12 @@ final class CollectLocalTranslations
 			return true;
 		}
 
-		return $discoveredFile['filename_without_extension'] === $projectSlug;
+		if ($discoveredFile['filename_without_extension'] === $projectSlug) {
+			return true;
+		}
+
+		// Allow locale-style files like lang/en.json or lang/de.json in sync mode.
+		return self::isLanguageCodeLike($discoveredFile['filename_without_extension']);
 	}
 
 	/**
@@ -235,29 +241,4 @@ final class CollectLocalTranslations
 		return $result;
 	}
 
-	/**
-	 * Convert dot-notation keys back to nested array.
-	 */
-	private static function unflattenTranslations(array $flat): array
-	{
-		$result = [];
-
-		foreach ($flat as $key => $value) {
-			$parts = explode('.', $key);
-			$current = &$result;
-
-			foreach ($parts as $i => $part) {
-				if ($i === count($parts) - 1) {
-					$current[$part] = $value;
-				} else {
-					if (! isset($current[$part]) || ! is_array($current[$part])) {
-						$current[$part] = [];
-					}
-					$current = &$current[$part];
-				}
-			}
-		}
-
-		return $result;
-	}
 }
