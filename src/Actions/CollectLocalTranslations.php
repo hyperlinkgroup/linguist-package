@@ -106,8 +106,7 @@ final class CollectLocalTranslations
 			return [];
 		}
 
-		$configured = lang_path();
-		$configuredPath = is_string($configured) ? $configured : '';
+		$configuredPath = lang_path();
 		$fallback = base_path('lang');
 
 		$reasons = [];
