@@ -267,7 +267,22 @@ final class LinguistSetupCommand extends Command
 		$this->components->info('Current translation status:');
 		$this->components->twoColumnDetail('Local keys discovered', (string) $localKeyCount);
 		$this->components->twoColumnDetail('Remote keys', $remoteKeyCount === null ? 'N/A' : (string) $remoteKeyCount);
+		$this->components->twoColumnDetail(
+			'Local JSON search roots',
+			$this->formatTranslationSearchRoots()
+		);
 		$this->newLine();
+	}
+
+	private function formatTranslationSearchRoots(): string
+	{
+		$roots = CollectLocalTranslations::translationFileSearchRoots();
+
+		if ($roots !== []) {
+			return implode(', ', $roots);
+		}
+
+		return 'none (' . implode('; ', CollectLocalTranslations::translationFileSearchRootIssues()) . ')';
 	}
 
 	private function reportResults(array $results): int

@@ -180,7 +180,22 @@ class LinguistCommand extends Command
 		$this->components->info('Current translation status:');
 		$this->components->twoColumnDetail('Local Translation Keys', (string) $localKeyCount);
 		$this->components->twoColumnDetail('Linguist Project Translation Keys', $remoteKeyCount === null ? 'N/A' : (string) $remoteKeyCount);
+		$this->components->twoColumnDetail(
+			'Local JSON search roots',
+			$this->formatTranslationSearchRoots()
+		);
 		$this->newLine();
+	}
+
+	private function formatTranslationSearchRoots(): string
+	{
+		$roots = CollectLocalTranslations::translationFileSearchRoots();
+
+		if ($roots !== []) {
+			return implode(', ', $roots);
+		}
+
+		return 'none (' . implode('; ', CollectLocalTranslations::translationFileSearchRootIssues()) . ')';
 	}
 
 	private function resolveMode(): ?string
