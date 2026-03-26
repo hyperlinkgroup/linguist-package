@@ -7,6 +7,51 @@ afterEach(function () {
 	cleanTranslationFiles();
 });
 
+test('action falls back to base_path lang when lang_path is not a usable directory', function () {
+	$previous = $this->app->langPath();
+
+	File::ensureDirectoryExists(base_path('lang/EN'));
+	File::put(base_path('lang/EN/fallback.json'), json_encode(['k' => 'v'], JSON_PRETTY_PRINT));
+
+	try {
+		$this->app->useLangPath(storage_path('linguist-missing-lang-' . uniqid()));
+
+		$action = new CollectLocalTranslations;
+		$translations = $action->handle('fallback');
+
+		expect($translations)->toHaveKey('EN')
+			->and($translations['EN']['k'])->toBe('v')
+			->and(CollectLocalTranslations::translationFileSearchRoots())->toBe([base_path('lang')]);
+	} finally {
+		$this->app->useLangPath($previous);
+		if (File::isDirectory(base_path('lang'))) {
+			File::deleteDirectory(base_path('lang'));
+		}
+	}
+});
+
+test('action falls back to base_path lang when lang_path is an empty string', function () {
+	$previous = $this->app->langPath();
+
+	File::ensureDirectoryExists(base_path('lang/EN'));
+	File::put(base_path('lang/EN/empty-path.json'), json_encode(['x' => 'y'], JSON_PRETTY_PRINT));
+
+	try {
+		$this->app->useLangPath('');
+
+		$action = new CollectLocalTranslations;
+		$translations = $action->handle('empty-path');
+
+		expect($translations)->toHaveKey('EN')
+			->and($translations['EN']['x'])->toBe('y');
+	} finally {
+		$this->app->useLangPath($previous);
+		if (File::isDirectory(base_path('lang'))) {
+			File::deleteDirectory(base_path('lang'));
+		}
+	}
+});
+
 test('action collects translations from local directories', function () {
 	File::ensureDirectoryExists(lang_path('DE'));
 	File::ensureDirectoryExists(lang_path('EN'));
@@ -57,13 +102,11 @@ test('action resolves language from directory for nested project files', functio
 
 	$action = new CollectLocalTranslations;
 	$allTranslations = $action->handle('project');
-	$english = $action->getTranslationsForLanguage('EN', 'project');
 
 	expect($allTranslations)->toHaveKey('EN')
 		->and($allTranslations)->not->toHaveKey('PROJECT')
 		->and($allTranslations['EN'])->toHaveKey('nested')
-		->and($english)->toHaveKey('nested')
-		->and($english['nested'])->toBe('From project file');
+		->and($allTranslations['EN']['nested'])->toBe('From project file');
 });
 
 test('action filters non-managed files by project slug when provided', function () {
@@ -88,6 +131,24 @@ test('action filters non-managed files by project slug when provided', function 
 		->and($translations['EN'])->not->toHaveKey('b.only');
 });
 
+test('action includes locale json files when project slug is provided', function () {
+	File::ensureDirectoryExists(lang_path());
+
+	File::put(lang_path('de.json'), json_encode([
+		'hello' => 'Hallo',
+	], JSON_PRETTY_PRINT));
+	File::put(lang_path('messages.json'), json_encode([
+		'ignored' => 'not locale file',
+	], JSON_PRETTY_PRINT));
+
+	$action = new CollectLocalTranslations;
+	$translations = $action->handle('project-a');
+
+	expect($translations)->toHaveKey('DE')
+		->and($translations['DE'])->toHaveKey('hello')
+		->and($translations)->not->toHaveKey('MESSAGES');
+});
+
 test('action parses nested translation files', function () {
 	File::ensureDirectoryExists(lang_path());
 
@@ -104,38 +165,17 @@ test('action parses nested translation files', function () {
 	);
 
 	$action = new CollectLocalTranslations;
-	$translations = $action->getTranslationsForLanguage('EN');
+	$translations = $action->handle();
 
-	expect($translations)->toHaveKey('user.profile.title')
-		->and($translations['user.profile.title'])->toBe('User Profile')
-		->and($translations['hello'])->toBe('Hello World');
-});
-
-test('action writes translations to file', function () {
-	$action = new CollectLocalTranslations;
-
-	$translations = [
-		'hello' => 'Hello World',
-		'user.profile.title' => 'User Profile',
-	];
-
-	$success = $action->writeTranslations('EN', 'test-project', $translations);
-
-	expect($success)->toBeTrue();
-
-	$filePath = lang_path('EN/linguist.json');
-	expect(File::exists($filePath))->toBeTrue();
-
-	$content = json_decode(File::get($filePath), true);
-	expect($content)->toHaveKey('hello')
-		->and($content['hello'])->toBe('Hello World')
-		->and($content)->toHaveKey('user')
-		->and($content['user']['profile']['title'])->toBe('User Profile');
+	expect($translations)->toHaveKey('EN')
+		->and($translations['EN'])->toHaveKey('user.profile.title')
+		->and($translations['EN']['user.profile.title'])->toBe('User Profile')
+		->and($translations['EN']['hello'])->toBe('Hello World');
 });
 
 test('action returns empty array for non-existent language', function () {
 	$action = new CollectLocalTranslations;
-	$translations = $action->getTranslationsForLanguage('XX', 'nonexistent');
+	$translations = $action->handle('nonexistent');
 
 	expect($translations)->toBe([]);
 });
@@ -158,10 +198,8 @@ test('linguist managed keys override non linguist keys on collision', function (
 
 	$action = new CollectLocalTranslations;
 	$translations = $action->handle();
-	$english = $action->getTranslationsForLanguage('EN', 'test-project');
 
-	expect($translations['EN']['hello'])->toBe('Hello from linguist')
-		->and($english['hello'])->toBe('Hello from linguist');
+	expect($translations['EN']['hello'])->toBe('Hello from linguist');
 });
 
 test('action can be run as an invokable', function () {

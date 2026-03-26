@@ -66,7 +66,7 @@ test('count translation keys falls back to export payload when list endpoint fai
 		'https://api.linguist.eu/projects/test-project/languages' => Http::response([
 			'data' => ['EN', 'DE'],
 		], 200),
-		'https://api.linguist.eu/projects/test-project/export/json/EN?prefix=:' => Http::response([
+		'https://api.linguist.eu/projects/test-project/export/json/EN?prefix=%3A' => Http::response([
 			'url' => 'https://api.linguist.eu/export/en',
 		], 200),
 		'https://api.linguist.eu/export/en' => Http::response([
@@ -87,6 +87,64 @@ test('count translation keys falls back to export payload when list endpoint fai
 	);
 
 	expect($client->countTranslationKeys())->toBe(3);
+});
+
+test('count translation keys fallback supports language objects from languages endpoint', function () {
+	Http::preventStrayRequests();
+	Http::fake([
+		'https://api.linguist.eu/projects/test-project/translation-keys?per_page=1&page=1' => Http::response([], 403),
+		'https://api.linguist.eu/projects/test-project/languages' => Http::response([
+			'data' => [
+				['id' => 1, 'code' => 'en'],
+				['id' => 2, 'code' => 'DE'],
+			],
+		], 200),
+		'https://api.linguist.eu/projects/test-project/export/json/EN?prefix=%3A' => Http::response([
+			'url' => 'https://api.linguist.eu/export/en',
+		], 200),
+		'https://api.linguist.eu/export/en' => Http::response([
+			'auth' => [
+				'login' => 'Login',
+			],
+		], 200),
+	]);
+
+	$client = new LinguistApiClient(
+		baseUrl: 'https://api.linguist.eu',
+		token: 'test-token',
+		projectSlug: 'test-project',
+	);
+
+	expect($client->countTranslationKeys())->toBe(1);
+});
+
+test('count translation keys fallback retries export URL without prefix when prefixed export is empty', function () {
+	Http::preventStrayRequests();
+	Http::fake([
+		'https://api.linguist.eu/projects/test-project/translation-keys?per_page=1&page=1' => Http::response([], 403),
+		'https://api.linguist.eu/projects/test-project/languages' => Http::response([
+			'data' => ['EN'],
+		], 200),
+		'https://api.linguist.eu/projects/test-project/export/json/EN?prefix=%3A' => Http::response([
+			'url' => 'https://api.linguist.eu/export/en-prefixed',
+		], 200),
+		'https://api.linguist.eu/export/en-prefixed' => Http::response([], 200),
+		'https://api.linguist.eu/projects/test-project/export/json/EN' => Http::response([
+			'url' => 'https://api.linguist.eu/export/en-no-prefix',
+		], 200),
+		'https://api.linguist.eu/export/en-no-prefix' => Http::response([
+			'ok' => 'Ok',
+			'cancel' => 'Cancel',
+		], 200),
+	]);
+
+	$client = new LinguistApiClient(
+		baseUrl: 'https://api.linguist.eu',
+		token: 'test-token',
+		projectSlug: 'test-project',
+	);
+
+	expect($client->countTranslationKeys())->toBe(2);
 });
 
 test('get project language id map falls back to single project when list omits languages', function () {
