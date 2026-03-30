@@ -44,17 +44,21 @@ final class PullTranslations
 				throw new NoLanguageActivatedException;
 			}
 
-			$keysProcessed = 0;
+			$maxKeysProcessed = 0;
 
 			foreach ($languages as $language) {
 				$result = $this->apiClient->downloadLanguageExportWithPrefixFallback($language);
 
 				if ($result['success']) {
 					$languageResults[$language] = ['success' => true];
-					$keysProcessed += $result['key_count'];
 
 					$body = $result['body'] ?? null;
 					if (is_string($body) && $body !== '') {
+						$decoded = json_decode($body, true);
+						if (is_array($decoded)) {
+							$maxKeysProcessed = max($maxKeysProcessed, count(array_keys($decoded)));
+						}
+
 						$this->writeDownloadedTranslations($language, $body);
 					}
 				} else {
@@ -73,7 +77,7 @@ final class PullTranslations
 				overallSuccess: $successCount === count($languageResults),
 				languageResults: $languageResults,
 				errors: $errors,
-				keysProcessed: $keysProcessed,
+				keysProcessed: $maxKeysProcessed,
 			);
 
 		} catch (NoLanguageActivatedException $e) {
@@ -102,4 +106,5 @@ final class PullTranslations
 			File::delete($legacyPath);
 		}
 	}
+
 }

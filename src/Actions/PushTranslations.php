@@ -90,7 +90,7 @@ final class PushTranslations
 
 					if ($response->successful()) {
 						foreach ($batch as $key => $translationsForKey) {
-							$keysProcessed += count($translationsForKey);
+							$keysProcessed++;
 							$currentKey++;
 
 							if (is_callable($onProgress)) {

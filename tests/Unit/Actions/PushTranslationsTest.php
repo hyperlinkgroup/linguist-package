@@ -50,7 +50,7 @@ test('push sends one request per unique key with merged language payload', funct
 	$result = $action->handle('test-project');
 
 	expect($result->overallSuccess)->toBeTrue()
-		->and($result->keysProcessed)->toBe(4)
+		->and($result->keysProcessed)->toBe(2)
 		->and($result->keysFailed)->toBe(0);
 
 	Http::assertSentCount(2);

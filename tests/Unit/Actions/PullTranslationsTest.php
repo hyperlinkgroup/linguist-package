@@ -41,7 +41,7 @@ test('pull counts processed keys from downloaded translation files', function ()
 	$result = $action->handle('test-project');
 
 	expect($result->overallSuccess)->toBeTrue()
-		->and($result->keysProcessed)->toBe(4)
+		->and($result->keysProcessed)->toBe(2)
 		->and($result->languageResults)->toHaveKeys(['EN', 'DE']);
 });
 
@@ -65,6 +65,41 @@ test('pull supports language objects from languages endpoint', function () {
 		], 200),
 		'https://api.linguist.eu/export/de' => Http::response([
 			'hello' => 'Hallo',
+		], 200),
+	]);
+
+	$client = new LinguistApiClient(
+		baseUrl: 'https://api.linguist.eu',
+		token: 'test-token',
+		projectSlug: 'test-project',
+	);
+
+	$action = new PullTranslations($client);
+	$result = $action->handle('test-project');
+
+	expect($result->overallSuccess)->toBeTrue()
+		->and($result->keysProcessed)->toBe(1)
+		->and($result->languageResults)->toHaveKeys(['EN', 'DE']);
+});
+
+test('pull reports processed keys using largest successful language payload', function () {
+	Http::preventStrayRequests();
+	Http::fake([
+		'https://api.linguist.eu/v2/projects/test-project/languages' => Http::response([
+			'data' => ['EN', 'DE'],
+		], 200),
+		'https://api.linguist.eu/v2/projects/test-project/export/json/EN?prefix=%3A' => Http::response([
+			'url' => 'https://api.linguist.eu/export/en',
+		], 200),
+		'https://api.linguist.eu/v2/projects/test-project/export/json/DE?prefix=%3A' => Http::response([
+			'url' => 'https://api.linguist.eu/export/de',
+		], 200),
+		'https://api.linguist.eu/export/en' => Http::response([
+			'hello' => 'Hello',
+		], 200),
+		'https://api.linguist.eu/export/de' => Http::response([
+			'hello' => 'Hallo',
+			'goodbye' => 'Tschuess',
 		], 200),
 	]);
 

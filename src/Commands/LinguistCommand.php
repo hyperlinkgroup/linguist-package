@@ -172,7 +172,7 @@ class LinguistCommand extends Command
 
 		try {
 			$apiClient->setProjectSlug($projectSlug);
-			$remoteKeyCount = $apiClient->countTranslationKeys();
+			$remoteKeyCount = $apiClient->countTranslationKeysFromExports();
 		} catch (\Throwable) {
 			$remoteKeyCount = null;
 		}
@@ -241,8 +241,8 @@ class LinguistCommand extends Command
 		return (string) select(
 			label: 'Select sync mode',
 			options: [
-				'sync' => 'Sync - Merge local and remote translations',
 				'pull' => 'Pull - Download translations from Linguist (overwrite local)',
+				'sync' => 'Sync - Merge local and remote translations',
 				'push' => 'Push - Upload local translations to Linguist',
 			],
 			default: 'sync'
