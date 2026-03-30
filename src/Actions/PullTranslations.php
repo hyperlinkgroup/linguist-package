@@ -91,8 +91,15 @@ final class PullTranslations
 
 	private function writeDownloadedTranslations(string $language, string $body): void
 	{
-		$langDir = lang_path(strtoupper($language));
-		File::ensureDirectoryExists($langDir);
-		File::put("{$langDir}/linguist.json", $body);
+		File::ensureDirectoryExists(lang_path());
+
+		$normalizedLanguage = strtolower($language);
+		File::put(lang_path("{$normalizedLanguage}.json"), $body);
+
+		// Cleanup legacy managed file format (lang/DE/linguist.json) to avoid stale overrides.
+		$legacyPath = lang_path(strtoupper($language) . '/linguist.json');
+		if (File::exists($legacyPath)) {
+			File::delete($legacyPath);
+		}
 	}
 }

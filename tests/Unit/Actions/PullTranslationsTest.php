@@ -2,6 +2,7 @@
 
 use Hyperlinkgroup\Linguist\Actions\PullTranslations;
 use Hyperlinkgroup\Linguist\Services\LinguistApiClient;
+use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Http;
 
 afterEach(function () {
@@ -112,4 +113,71 @@ test('pull retries export download without prefix when prefixed export is empty'
 	expect($result->overallSuccess)->toBeTrue()
 		->and($result->keysProcessed)->toBe(2)
 		->and($result->languageResults)->toHaveKey('EN');
+});
+
+test('pull writes lowercase laravel locale json files', function () {
+	Http::preventStrayRequests();
+	Http::fake([
+		'https://api.linguist.eu/projects/test-project/languages' => Http::response([
+			'data' => ['EN', 'DE'],
+		], 200),
+		'https://api.linguist.eu/projects/test-project/export/json/EN?prefix=%3A' => Http::response([
+			'url' => 'https://api.linguist.eu/export/en',
+		], 200),
+		'https://api.linguist.eu/projects/test-project/export/json/DE?prefix=%3A' => Http::response([
+			'url' => 'https://api.linguist.eu/export/de',
+		], 200),
+		'https://api.linguist.eu/export/en' => Http::response([
+			'hello' => 'Hello',
+		], 200),
+		'https://api.linguist.eu/export/de' => Http::response([
+			'hello' => 'Hallo',
+		], 200),
+	]);
+
+	$client = new LinguistApiClient(
+		baseUrl: 'https://api.linguist.eu',
+		token: 'test-token',
+		projectSlug: 'test-project',
+	);
+
+	$action = new PullTranslations($client);
+	$result = $action->handle('test-project');
+
+	expect($result->overallSuccess)->toBeTrue()
+		->and(File::exists(lang_path('en.json')))->toBeTrue()
+		->and(File::exists(lang_path('de.json')))->toBeTrue()
+		->and(File::exists(lang_path('EN/linguist.json')))->toBeFalse()
+		->and(File::exists(lang_path('DE/linguist.json')))->toBeFalse();
+});
+
+test('pull removes existing legacy managed language file', function () {
+	File::ensureDirectoryExists(lang_path('DE'));
+	File::put(lang_path('DE/linguist.json'), json_encode(['old' => 'value']));
+
+	Http::preventStrayRequests();
+	Http::fake([
+		'https://api.linguist.eu/projects/test-project/languages' => Http::response([
+			'data' => ['DE'],
+		], 200),
+		'https://api.linguist.eu/projects/test-project/export/json/DE?prefix=%3A' => Http::response([
+			'url' => 'https://api.linguist.eu/export/de',
+		], 200),
+		'https://api.linguist.eu/export/de' => Http::response([
+			'hello' => 'Hallo',
+		], 200),
+	]);
+
+	$client = new LinguistApiClient(
+		baseUrl: 'https://api.linguist.eu',
+		token: 'test-token',
+		projectSlug: 'test-project',
+	);
+
+	$action = new PullTranslations($client);
+	$result = $action->handle('test-project');
+
+	expect($result->overallSuccess)->toBeTrue()
+		->and(File::exists(lang_path('de.json')))->toBeTrue()
+		->and(File::exists(lang_path('DE/linguist.json')))->toBeFalse();
 });

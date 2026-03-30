@@ -227,7 +227,7 @@ test('artisan command succeeds with valid configuration', function () {
 		->expectsOutputToContain('Sync completed');
 
 	$languages->each(function (string $language) {
-		assertFileExists(lang_path("$language/linguist.json"));
+		assertFileExists(lang_path(strtolower($language) . '.json'));
 	});
 });
 
