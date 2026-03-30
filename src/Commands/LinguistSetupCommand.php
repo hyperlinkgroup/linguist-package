@@ -254,7 +254,7 @@ final class LinguistSetupCommand extends Command
 		if (($projectChoice['type'] ?? '') === 'existing' && isset($projectChoice['slug'])) {
 			try {
 				$client = new LinguistApiClient(
-					baseUrl: config('linguist.url', 'https://api.linguist.eu/'),
+					baseUrl: config('linguist.url', 'https://api.linguist.eu/v2'),
 					token: $apiToken,
 					projectSlug: (string) $projectChoice['slug'],
 				);

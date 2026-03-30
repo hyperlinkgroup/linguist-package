@@ -26,7 +26,7 @@ test('push sends one request per unique key with merged language payload', funct
 
 	Http::preventStrayRequests();
 	Http::fake([
-		'https://api.linguist.eu/projects?per_page=100' => Http::response([
+		'https://api.linguist.eu/v2/projects?per_page=100' => Http::response([
 			'data' => [[
 				'slug' => 'test-project',
 				'languages' => [
@@ -35,7 +35,7 @@ test('push sends one request per unique key with merged language payload', funct
 				],
 			]],
 		], 200),
-		'https://api.linguist.eu/projects/test-project/translation-keys' => Http::response([
+		'https://api.linguist.eu/v2/projects/test-project/translation-keys' => Http::response([
 			'data' => ['id' => 1],
 		], 200),
 	]);
@@ -56,7 +56,7 @@ test('push sends one request per unique key with merged language payload', funct
 	Http::assertSentCount(2);
 
 	Http::assertSent(function (Request $request) {
-		if ($request->url() !== 'https://api.linguist.eu/projects/test-project/translation-keys') {
+		if ($request->url() !== 'https://api.linguist.eu/v2/projects/test-project/translation-keys') {
 			return false;
 		}
 
@@ -81,7 +81,7 @@ test('push reports progress for each uploaded key', function () {
 
 	Http::preventStrayRequests();
 	Http::fake([
-		'https://api.linguist.eu/projects?per_page=100' => Http::response([
+		'https://api.linguist.eu/v2/projects?per_page=100' => Http::response([
 			'data' => [[
 				'slug' => 'test-project',
 				'languages' => [
@@ -90,7 +90,7 @@ test('push reports progress for each uploaded key', function () {
 				],
 			]],
 		], 200),
-		'https://api.linguist.eu/projects/test-project/translation-keys' => Http::response([
+		'https://api.linguist.eu/v2/projects/test-project/translation-keys' => Http::response([
 			'data' => ['id' => 1],
 		], 200),
 	]);

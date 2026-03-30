@@ -56,7 +56,7 @@ return [
      | Linguist API URL
      |--------------------------------------------------------------------------
      */
-    'url' => env('LINGUIST_URL', 'https://api.linguist.eu/'),
+    'url' => env('LINGUIST_URL', 'https://api.linguist.eu/v2'),
 
     /*
      |--------------------------------------------------------------------------
@@ -82,6 +82,8 @@ return [
 ```
 
 The setup wizard automatically writes these values to your `.env` file.
+
+`LINGUIST_URL` should point to the versioned API base URL (for example `https://api.your-domain.com/v2`).
 
 ## Commands
 
@@ -137,7 +139,7 @@ Downloads all translations from Linguist and overwrites local files:
 
 - Fetches all active languages
 - Downloads translation files
-- Replaces local files entirely
+- Replaces local files entirely in Laravel native locale JSON format (`lang/en.json`, `lang/de.json`, ...)
 
 ### Push Mode
 
@@ -236,18 +238,18 @@ The test suite includes:
 
 ## API Endpoints
 
-The package communicates with Linguist's REST API:
+The package communicates with Linguist's REST API (`/v2`):
 
-- `GET /projects` - List available projects
-- `POST /projects` - Create new project
-- `PATCH /projects/{project}` - Update project
-- `GET /projects/{project}/languages` - List project languages
-- `GET /projects/{project}/export/json/{language}` - Get export URL
-- `GET /projects/{project}/translation-keys` - List translation keys
-- `POST /projects/{project}/translation-keys` - Create/update key
-- `PATCH /projects/{project}/translation-keys/{key}` - Update key
-- `DELETE /projects/{project}/translation-keys/{key}` - Delete key
-- `POST /projects/{project}/translate` - Trigger auto-translation
+- `GET /v2/projects` - List available projects
+- `POST /v2/projects` - Create new project
+- `PATCH /v2/projects/{project}` - Update project
+- `GET /v2/projects/{project}/languages` - List project languages
+- `GET /v2/projects/{project}/export/json/{language}` - Get export URL
+- `GET /v2/projects/{project}/translation-keys` - List translation keys
+- `POST /v2/projects/{project}/translation-keys` - Create/update key
+- `PATCH /v2/projects/{project}/translation-keys/{key}` - Update key
+- `DELETE /v2/projects/{project}/translation-keys/{key}` - Delete key
+- `POST /v2/projects/{project}/translate` - Trigger auto-translation
 
 All endpoints require Bearer token authentication.
 

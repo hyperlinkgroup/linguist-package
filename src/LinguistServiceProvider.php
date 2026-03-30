@@ -38,7 +38,7 @@ class LinguistServiceProvider extends PackageServiceProvider
 		// Register API Client
 		$this->app->singleton(LinguistApiClient::class, function () {
 			return new LinguistApiClient(
-				baseUrl: config('linguist.url', 'https://api.linguist.eu/'),
+				baseUrl: config('linguist.url', 'https://api.linguist.eu/v2'),
 				token: config('linguist.token', ''),
 				projectSlug: config('linguist.project', ''),
 			);

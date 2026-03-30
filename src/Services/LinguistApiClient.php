@@ -18,9 +18,20 @@ final class LinguistApiClient
 
 	public function __construct(string $baseUrl, string $token, string $projectSlug = '')
 	{
-		$this->baseUrl = rtrim($baseUrl, '/');
+		$this->baseUrl = $this->normalizeBaseUrl($baseUrl);
 		$this->token = $token;
 		$this->projectSlug = $projectSlug;
+	}
+
+	private function normalizeBaseUrl(string $baseUrl): string
+	{
+		$normalizedBaseUrl = rtrim($baseUrl, '/');
+
+		if (preg_match('#/v\d+$#', $normalizedBaseUrl) === 1) {
+			return $normalizedBaseUrl;
+		}
+
+		return $normalizedBaseUrl . '/v2';
 	}
 
 	public function setProjectSlug(string $projectSlug): void

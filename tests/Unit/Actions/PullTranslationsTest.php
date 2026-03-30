@@ -12,13 +12,13 @@ afterEach(function () {
 test('pull counts processed keys from downloaded translation files', function () {
 	Http::preventStrayRequests();
 	Http::fake([
-		'https://api.linguist.eu/projects/test-project/languages' => Http::response([
+		'https://api.linguist.eu/v2/projects/test-project/languages' => Http::response([
 			'data' => ['EN', 'DE'],
 		], 200),
-		'https://api.linguist.eu/projects/test-project/export/json/EN?prefix=%3A' => Http::response([
+		'https://api.linguist.eu/v2/projects/test-project/export/json/EN?prefix=%3A' => Http::response([
 			'url' => 'https://api.linguist.eu/export/en',
 		], 200),
-		'https://api.linguist.eu/projects/test-project/export/json/DE?prefix=%3A' => Http::response([
+		'https://api.linguist.eu/v2/projects/test-project/export/json/DE?prefix=%3A' => Http::response([
 			'url' => 'https://api.linguist.eu/export/de',
 		], 200),
 		'https://api.linguist.eu/export/en' => Http::response([
@@ -48,16 +48,16 @@ test('pull counts processed keys from downloaded translation files', function ()
 test('pull supports language objects from languages endpoint', function () {
 	Http::preventStrayRequests();
 	Http::fake([
-		'https://api.linguist.eu/projects/test-project/languages' => Http::response([
+		'https://api.linguist.eu/v2/projects/test-project/languages' => Http::response([
 			'data' => [
 				['id' => 1, 'code' => 'en'],
 				['id' => 2, 'code' => 'DE'],
 			],
 		], 200),
-		'https://api.linguist.eu/projects/test-project/export/json/EN?prefix=%3A' => Http::response([
+		'https://api.linguist.eu/v2/projects/test-project/export/json/EN?prefix=%3A' => Http::response([
 			'url' => 'https://api.linguist.eu/export/en',
 		], 200),
-		'https://api.linguist.eu/projects/test-project/export/json/DE?prefix=%3A' => Http::response([
+		'https://api.linguist.eu/v2/projects/test-project/export/json/DE?prefix=%3A' => Http::response([
 			'url' => 'https://api.linguist.eu/export/de',
 		], 200),
 		'https://api.linguist.eu/export/en' => Http::response([
@@ -85,14 +85,14 @@ test('pull supports language objects from languages endpoint', function () {
 test('pull retries export download without prefix when prefixed export is empty', function () {
 	Http::preventStrayRequests();
 	Http::fake([
-		'https://api.linguist.eu/projects/test-project/languages' => Http::response([
+		'https://api.linguist.eu/v2/projects/test-project/languages' => Http::response([
 			'data' => ['EN'],
 		], 200),
-		'https://api.linguist.eu/projects/test-project/export/json/EN?prefix=%3A' => Http::response([
+		'https://api.linguist.eu/v2/projects/test-project/export/json/EN?prefix=%3A' => Http::response([
 			'url' => 'https://api.linguist.eu/export/en-prefixed',
 		], 200),
 		'https://api.linguist.eu/export/en-prefixed' => Http::response([], 200),
-		'https://api.linguist.eu/projects/test-project/export/json/EN' => Http::response([
+		'https://api.linguist.eu/v2/projects/test-project/export/json/EN' => Http::response([
 			'url' => 'https://api.linguist.eu/export/en-no-prefix',
 		], 200),
 		'https://api.linguist.eu/export/en-no-prefix' => Http::response([
@@ -118,13 +118,13 @@ test('pull retries export download without prefix when prefixed export is empty'
 test('pull writes lowercase laravel locale json files', function () {
 	Http::preventStrayRequests();
 	Http::fake([
-		'https://api.linguist.eu/projects/test-project/languages' => Http::response([
+		'https://api.linguist.eu/v2/projects/test-project/languages' => Http::response([
 			'data' => ['EN', 'DE'],
 		], 200),
-		'https://api.linguist.eu/projects/test-project/export/json/EN?prefix=%3A' => Http::response([
+		'https://api.linguist.eu/v2/projects/test-project/export/json/EN?prefix=%3A' => Http::response([
 			'url' => 'https://api.linguist.eu/export/en',
 		], 200),
-		'https://api.linguist.eu/projects/test-project/export/json/DE?prefix=%3A' => Http::response([
+		'https://api.linguist.eu/v2/projects/test-project/export/json/DE?prefix=%3A' => Http::response([
 			'url' => 'https://api.linguist.eu/export/de',
 		], 200),
 		'https://api.linguist.eu/export/en' => Http::response([
@@ -157,10 +157,10 @@ test('pull removes existing legacy managed language file', function () {
 
 	Http::preventStrayRequests();
 	Http::fake([
-		'https://api.linguist.eu/projects/test-project/languages' => Http::response([
+		'https://api.linguist.eu/v2/projects/test-project/languages' => Http::response([
 			'data' => ['DE'],
 		], 200),
-		'https://api.linguist.eu/projects/test-project/export/json/DE?prefix=%3A' => Http::response([
+		'https://api.linguist.eu/v2/projects/test-project/export/json/DE?prefix=%3A' => Http::response([
 			'url' => 'https://api.linguist.eu/export/de',
 		], 200),
 		'https://api.linguist.eu/export/de' => Http::response([

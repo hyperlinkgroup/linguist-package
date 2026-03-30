@@ -15,7 +15,7 @@ function configureValidLinguistConfig(string $project = 'test-project', string $
 	config([
 		'linguist.project' => $project,
 		'linguist.token' => $token,
-		'linguist.url' => 'https://api.linguist.eu',
+		'linguist.url' => 'https://api.linguist.eu/v2',
 		'linguist.temporary_directory' => 'tmp/translations',
 	]);
 }
@@ -28,10 +28,10 @@ function fakeLinguistApi(array $responses = []): void
 	Http::preventStrayRequests();
 
 	$defaultResponses = [
-		'https://api.linguist.eu/projects/*/languages' => Http::response([
+		'https://api.linguist.eu/v2/projects/*/languages' => Http::response([
 			'data' => ['EN', 'DE'],
 		]),
-		'https://api.linguist.eu/projects/*/export/json/*' => Http::response([
+		'https://api.linguist.eu/v2/projects/*/export/json/*' => Http::response([
 			'url' => 'https://api.linguist.eu/export/test-export-uuid',
 		]),
 		'https://api.linguist.eu/export/*' => Http::response([
@@ -54,7 +54,7 @@ function fakeProjectListResponse(array $projects = []): void
 	];
 
 	Http::fake([
-		'https://api.linguist.eu/projects' => Http::response([
+		'https://api.linguist.eu/v2/projects' => Http::response([
 			'data' => empty($projects) ? $defaultProjects : $projects,
 		]),
 	]);

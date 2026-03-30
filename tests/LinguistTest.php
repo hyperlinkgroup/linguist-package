@@ -63,7 +63,7 @@ test('that we can get all languages', function () {
 	Http::preventStrayRequests();
 
 	Http::fake([
-		'https://api.linguist.eu/projects/project/languages' => Http::response([
+		'https://api.linguist.eu/v2/projects/project/languages' => Http::response([
 			'data' => [
 				'EN',
 				'DE',
@@ -84,7 +84,7 @@ test('that we get an exception while getting all languages if the list is empty'
 	Http::preventStrayRequests();
 
 	Http::fake([
-		'https://api.linguist.eu/projects/project/languages' => Http::response([
+		'https://api.linguist.eu/v2/projects/project/languages' => Http::response([
 			'data' => [],
 		]),
 	]);
@@ -99,9 +99,7 @@ test('that we can create directories', function () {
 	Linguist::setLanguages($languages)
 		->createDirectories();
 
-	$languages->each(function (string $language) {
-		assertFileExists(lang_path("$language"));
-	});
+	assertFileExists(lang_path());
 
 	assertFileExists(storage_path(config('linguist.temporary_directory')));
 });
@@ -115,13 +113,13 @@ test('that we can download the files', function () {
 	Http::preventStrayRequests();
 
 	Http::fake([
-		'https://api.linguist.eu/projects/project/export/json/DE?prefix=:' => Http::response([
+		'https://api.linguist.eu/v2/projects/project/export/json/DE?prefix=:' => Http::response([
 			'url' => 'https://api.linguist.eu/export/dd9d79d3-135e-4f7e-b439-c35024ee0376?project=project&signature=363063c742f891af8dbeb4ac7d1940743ff083cdb0d30bbb736e0e773e694900',
 		]),
 		'https://api.linguist.eu/export/dd9d79d3-135e-4f7e-b439-c35024ee0376?project=project&signature=363063c742f891af8dbeb4ac7d1940743ff083cdb0d30bbb736e0e773e694900' => Http::response([
 			'Test' => 'Test German Translation',
 		]),
-		'https://api.linguist.eu/projects/project/export/json/EN?prefix=:' => Http::response([
+		'https://api.linguist.eu/v2/projects/project/export/json/EN?prefix=:' => Http::response([
 			'url' => 'https://api.linguist.eu/export/18682c32-2615-447e-8bdf-a4069a7bc8f2?project=project&signature=363063c742f891af8dbeb4ac7d1940743ff083cdb0d30bbb736e0e773e694900',
 		]),
 		'https://api.linguist.eu/export/18682c32-2615-447e-8bdf-a4069a7bc8f2?project=project&signature=363063c742f891af8dbeb4ac7d1940743ff083cdb0d30bbb736e0e773e694900' => Http::response([
@@ -152,7 +150,7 @@ test('that we can move the files', function () {
 	Linguist::moveFiles();
 
 	$languages->each(function (string $language) {
-		assertFileExists(lang_path("$language/project.json"));
+		assertFileExists(lang_path(strtolower($language) . '.json'));
 	});
 
 	assertFileDoesNotExist(storage_path(config('linguist.temporary_directory')));
@@ -168,16 +166,16 @@ test('that we can execute the command', function () {
 	Http::preventStrayRequests();
 
 	Http::fake([
-		'https://api.linguist.eu/projects/project/languages' => Http::response([
+		'https://api.linguist.eu/v2/projects/project/languages' => Http::response([
 			'data' => $languages->all(),
 		]),
-		'https://api.linguist.eu/projects/project/export/json/DE?prefix=:' => Http::response([
+		'https://api.linguist.eu/v2/projects/project/export/json/DE?prefix=:' => Http::response([
 			'url' => 'https://api.linguist.eu/export/dd9d79d3-135e-4f7e-b439-c35024ee0376?project=project&signature=363063c742f891af8dbeb4ac7d1940743ff083cdb0d30bbb736e0e773e694900',
 		]),
 		'https://api.linguist.eu/export/dd9d79d3-135e-4f7e-b439-c35024ee0376?project=project&signature=363063c742f891af8dbeb4ac7d1940743ff083cdb0d30bbb736e0e773e694900' => Http::response([
 			'Test' => 'Test German Translation',
 		]),
-		'https://api.linguist.eu/projects/project/export/json/EN?prefix=:' => Http::response([
+		'https://api.linguist.eu/v2/projects/project/export/json/EN?prefix=:' => Http::response([
 			'url' => 'https://api.linguist.eu/export/18682c32-2615-447e-8bdf-a4069a7bc8f2?project=project&signature=363063c742f891af8dbeb4ac7d1940743ff083cdb0d30bbb736e0e773e694900',
 		]),
 		'https://api.linguist.eu/export/18682c32-2615-447e-8bdf-a4069a7bc8f2?project=project&signature=363063c742f891af8dbeb4ac7d1940743ff083cdb0d30bbb736e0e773e694900' => Http::response([
@@ -188,7 +186,7 @@ test('that we can execute the command', function () {
 	Linguist::handle();
 
 	$languages->each(function (string $language) {
-		assertFileExists(lang_path("$language/project.json"));
+		assertFileExists(lang_path(strtolower($language) . '.json'));
 	});
 
 	assertFileDoesNotExist(storage_path(config('linguist.temporary_directory')));
@@ -204,16 +202,16 @@ test('artisan command succeeds with valid configuration', function () {
 	Http::preventStrayRequests();
 
 	Http::fake([
-		'https://api.linguist.eu/projects/project/languages' => Http::response([
+		'https://api.linguist.eu/v2/projects/project/languages' => Http::response([
 			'data' => $languages->all(),
 		]),
-		'https://api.linguist.eu/projects/project/export/json/DE?prefix=%3A' => Http::response([
+		'https://api.linguist.eu/v2/projects/project/export/json/DE?prefix=%3A' => Http::response([
 			'url' => 'https://api.linguist.eu/export/dd9d79d3-135e-4f7e-b439-c35024ee0376?project=project&signature=363063c742f891af8dbeb4ac7d1940743ff083cdb0d30bbb736e0e773e694900',
 		]),
 		'https://api.linguist.eu/export/dd9d79d3-135e-4f7e-b439-c35024ee0376?project=project&signature=363063c742f891af8dbeb4ac7d1940743ff083cdb0d30bbb736e0e773e694900' => Http::response([
 			'Test' => 'Test German Translation',
 		]),
-		'https://api.linguist.eu/projects/project/export/json/EN?prefix=%3A' => Http::response([
+		'https://api.linguist.eu/v2/projects/project/export/json/EN?prefix=%3A' => Http::response([
 			'url' => 'https://api.linguist.eu/export/18682c32-2615-447e-8bdf-a4069a7bc8f2?project=project&signature=363063c742f891af8dbeb4ac7d1940743ff083cdb0d30bbb736e0e773e694900',
 		]),
 		'https://api.linguist.eu/export/18682c32-2615-447e-8bdf-a4069a7bc8f2?project=project&signature=363063c742f891af8dbeb4ac7d1940743ff083cdb0d30bbb736e0e773e694900' => Http::response([
@@ -256,7 +254,7 @@ test('artisan command fails when no languages are activated', function () {
 	Http::preventStrayRequests();
 
 	Http::fake([
-		'https://api.linguist.eu/projects/project/languages' => Http::response([
+		'https://api.linguist.eu/v2/projects/project/languages' => Http::response([
 			'data' => [],
 		]),
 	]);

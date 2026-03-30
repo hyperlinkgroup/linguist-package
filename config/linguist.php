@@ -6,7 +6,7 @@ return [
 	 | Linguist API URL
 	 |--------------------------------------------------------------------------
 	 */
-	'url' => env('LINGUIST_URL', 'https://api.linguist.eu/'),
+	'url' => env('LINGUIST_URL', 'https://api.linguist.eu/v2'),
 
 	/*
 	 |--------------------------------------------------------------------------

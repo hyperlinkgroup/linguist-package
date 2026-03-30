@@ -38,7 +38,7 @@ final class SetupOrchestrator
 			// Step 1: Persist API token config
 			$configResults = PersistLinguistConfig::run([
 				'token' => $input->apiToken,
-				'url' => config('linguist.url', 'https://api.linguist.eu/'),
+				'url' => config('linguist.url', 'https://api.linguist.eu/v2'),
 			]);
 
 			$results['config_persisted'] = $configResults['token'] ?? false;
@@ -183,7 +183,7 @@ final class SetupOrchestrator
 	private function clientForToken(string $token): LinguistApiClient
 	{
 		return new LinguistApiClient(
-			baseUrl: config('linguist.url', 'https://api.linguist.eu/'),
+			baseUrl: config('linguist.url', 'https://api.linguist.eu/v2'),
 			token: $token,
 		);
 	}
@@ -194,7 +194,7 @@ final class SetupOrchestrator
 	public function validateApiToken(string $token): bool
 	{
 		$client = new LinguistApiClient(
-			baseUrl: config('linguist.url', 'https://api.linguist.eu/'),
+			baseUrl: config('linguist.url', 'https://api.linguist.eu/v2'),
 			token: $token,
 		);
 

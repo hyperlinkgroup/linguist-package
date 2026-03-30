@@ -8,7 +8,6 @@ use Illuminate\Http\Client\PendingRequest;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Http;
-use Illuminate\Support\Str;
 
 class Linguist
 {
@@ -58,12 +57,21 @@ class Linguist
 
 	protected function getBaseUrl(): string
 	{
-		$url = Str::of(config('linguist.url') ?? 'https://api.linguist.eu/');
-		if ($url->endsWith('/')) {
-			$url = $url->substr(0, -1);
+		$configuredUrl = (string) (config('linguist.url') ?? 'https://api.linguist.eu/v2');
+		$baseUrl = $this->normalizeBaseUrl($configuredUrl);
+
+		return $baseUrl . "/projects/$this->project";
+	}
+
+	private function normalizeBaseUrl(string $baseUrl): string
+	{
+		$normalizedBaseUrl = rtrim($baseUrl, '/');
+
+		if (preg_match('#/v\d+$#', $normalizedBaseUrl) === 1) {
+			return $normalizedBaseUrl;
 		}
 
-		return $url . "/projects/$this->project";
+		return $normalizedBaseUrl . '/v2';
 	}
 
 	protected function getHttp(): PendingRequest
@@ -121,10 +129,7 @@ class Linguist
 
 	protected function ensureDirectoriesExist(): void
 	{
-		$this->languages->each(function ($language) {
-			File::ensureDirectoryExists(lang_path($language));
-		});
-
+		File::ensureDirectoryExists(lang_path());
 		File::ensureDirectoryExists(storage_path($this->temporaryDirectory));
 	}
 
@@ -212,9 +217,14 @@ class Linguist
 
 		foreach ($files as $file) {
 			$language = $file->getFilenameWithoutExtension();
-			$destination = lang_path("$language/$this->project.json");
+			$destination = lang_path(strtolower($language) . '.json');
 
 			File::move($file, $destination);
+
+			$legacyPath = lang_path(strtoupper($language) . "/{$this->project}.json");
+			if (File::exists($legacyPath)) {
+				File::delete($legacyPath);
+			}
 		}
 
 		File::deleteDirectory(storage_path($this->temporaryDirectory));
