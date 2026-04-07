@@ -14,6 +14,5 @@ final class SyncCompleted
 	public function __construct(
 		public readonly string $projectSlug,
 		public readonly SyncResult $result,
-	) {
-	}
+	) {}
 }

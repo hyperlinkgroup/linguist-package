@@ -19,8 +19,7 @@ final class SyncTranslations
 
 	public function __construct(
 		private readonly LinguistApiClient $apiClient,
-	) {
-	}
+	) {}
 
 	/**
 	 * Two-way sync: upload local keys first, then download remote state.
