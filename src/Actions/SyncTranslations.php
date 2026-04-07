@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Hyperlinkgroup\Linguist\Actions;
 
 use Hyperlinkgroup\Linguist\DTO\SyncResult;
+use Hyperlinkgroup\Linguist\Events\SyncCompleted;
 use Hyperlinkgroup\Linguist\Services\LinguistApiClient;
 use Lorisleiva\Actions\Concerns\AsAction;
 
@@ -52,8 +53,12 @@ final class SyncTranslations
 					overwrite: false,
 					specificLanguages: $uploadLanguages,
 					onProgress: $onPushProgress,
+					emitEvent: false,
 				);
-			$pullResult = (new PullTranslations($this->apiClient))->handle($projectSlug);
+			$pullResult = (new PullTranslations($this->apiClient))->handle(
+				projectSlug: $projectSlug,
+				emitEvent: false,
+			);
 
 			$languageResults = $this->mergeLanguageResults($pushResult, $pullResult, $preLanguageResults);
 			$errors = array_values(array_unique(array_merge(
@@ -62,13 +67,19 @@ final class SyncTranslations
 				array_map(static fn (string $error): string => "Pull phase: {$error}", $pullResult->errors),
 			)));
 
-			return new SyncResult(
+			$result = new SyncResult(
 				overallSuccess: $errors === [] && $pushResult->overallSuccess && $pullResult->overallSuccess,
 				languageResults: $languageResults,
 				errors: $errors,
 				keysProcessed: $preKeysProcessed + $pushResult->keysProcessed + $pullResult->keysProcessed,
 				keysFailed: $preKeysFailed + $pushResult->keysFailed + $pullResult->keysFailed,
 			);
+
+			if ($result->overallSuccess) {
+				event(new SyncCompleted($projectSlug, $result));
+			}
+
+			return $result;
 
 		} catch (\Exception $e) {
 			return new SyncResult(

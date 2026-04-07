@@ -1,8 +1,10 @@
 <?php
 
 use Hyperlinkgroup\Linguist\Actions\PushTranslations;
+use Hyperlinkgroup\Linguist\Events\PushCompleted;
 use Hyperlinkgroup\Linguist\Services\LinguistApiClient;
 use Illuminate\Http\Client\Request;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Http;
 
@@ -119,4 +121,66 @@ test('push reports progress for each uploaded key', function () {
 		->and($progressEvents[0]['total'])->toBe(2)
 		->and($progressEvents[1]['current'])->toBe(2)
 		->and($progressEvents[1]['total'])->toBe(2);
+});
+
+test('push dispatches completion event on success', function () {
+	createTestTranslationFiles('test-project', ['EN', 'DE']);
+
+	Http::preventStrayRequests();
+	Http::fake([
+		'https://api.linguist.eu/v2/projects?per_page=100' => Http::response([
+			'data' => [[
+				'slug' => 'test-project',
+				'languages' => [
+					['id' => 10, 'code' => 'EN'],
+					['id' => 20, 'code' => 'DE'],
+				],
+			]],
+		], 200),
+		'https://api.linguist.eu/v2/projects/test-project/translation-keys' => Http::response([
+			'data' => ['id' => 1],
+		], 200),
+	]);
+
+	Event::fake([PushCompleted::class]);
+
+	$client = new LinguistApiClient(
+		baseUrl: 'https://api.linguist.eu',
+		token: 'test-token',
+		projectSlug: 'test-project',
+	);
+
+	$action = new PushTranslations($client);
+	$result = $action->handle('test-project');
+
+	expect($result->overallSuccess)->toBeTrue();
+
+	Event::assertDispatched(PushCompleted::class, function (PushCompleted $event) {
+		return $event->projectSlug === 'test-project'
+			&& $event->result->overallSuccess === true;
+	});
+});
+
+test('push does not dispatch completion event on failure', function () {
+	Http::preventStrayRequests();
+	Http::fake([
+		'https://api.linguist.eu/v2/projects?per_page=100' => Http::response([
+			'data' => [],
+		], 200),
+	]);
+
+	Event::fake([PushCompleted::class]);
+
+	$client = new LinguistApiClient(
+		baseUrl: 'https://api.linguist.eu',
+		token: 'test-token',
+		projectSlug: 'test-project',
+	);
+
+	$action = new PushTranslations($client);
+	$result = $action->handle('test-project');
+
+	expect($result->overallSuccess)->toBeFalse();
+
+	Event::assertNotDispatched(PushCompleted::class);
 });

@@ -1,7 +1,9 @@
 <?php
 
 use Hyperlinkgroup\Linguist\Actions\PullTranslations;
+use Hyperlinkgroup\Linguist\Events\PullCompleted;
 use Hyperlinkgroup\Linguist\Services\LinguistApiClient;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Http;
 
@@ -215,4 +217,59 @@ test('pull removes existing legacy managed language file', function () {
 	expect($result->overallSuccess)->toBeTrue()
 		->and(File::exists(lang_path('de.json')))->toBeTrue()
 		->and(File::exists(lang_path('DE/linguist.json')))->toBeFalse();
+});
+
+test('pull dispatches completion event on success', function () {
+	Http::preventStrayRequests();
+	Http::fake([
+		'https://api.linguist.eu/v2/projects/test-project/languages' => Http::response([
+			'data' => ['EN'],
+		], 200),
+		'https://api.linguist.eu/v2/projects/test-project/export/json/EN?prefix=%3A' => Http::response([
+			'url' => 'https://api.linguist.eu/export/en',
+		], 200),
+		'https://api.linguist.eu/export/en' => Http::response([
+			'hello' => 'Hello',
+		], 200),
+	]);
+
+	Event::fake([PullCompleted::class]);
+
+	$client = new LinguistApiClient(
+		baseUrl: 'https://api.linguist.eu',
+		token: 'test-token',
+		projectSlug: 'test-project',
+	);
+
+	$action = new PullTranslations($client);
+	$result = $action->handle('test-project');
+
+	expect($result->overallSuccess)->toBeTrue();
+
+	Event::assertDispatched(PullCompleted::class, function (PullCompleted $event) {
+		return $event->projectSlug === 'test-project'
+			&& $event->result->overallSuccess === true;
+	});
+});
+
+test('pull does not dispatch completion event on failure', function () {
+	Http::preventStrayRequests();
+	Http::fake([
+		'https://api.linguist.eu/v2/projects/test-project/languages' => Http::response([], 500),
+	]);
+
+	Event::fake([PullCompleted::class]);
+
+	$client = new LinguistApiClient(
+		baseUrl: 'https://api.linguist.eu',
+		token: 'test-token',
+		projectSlug: 'test-project',
+	);
+
+	$action = new PullTranslations($client);
+	$result = $action->handle('test-project');
+
+	expect($result->overallSuccess)->toBeFalse();
+
+	Event::assertNotDispatched(PullCompleted::class);
 });

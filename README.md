@@ -149,6 +149,33 @@ Uploads local translations to Linguist:
 - Creates/updates keys on remote
 - Preserves remote-only keys
 
+## Events
+
+The package dispatches Laravel events after successful operations:
+
+- `Hyperlinkgroup\Linguist\Events\SyncCompleted`
+- `Hyperlinkgroup\Linguist\Events\PullCompleted`
+- `Hyperlinkgroup\Linguist\Events\PushCompleted`
+
+Each event contains:
+
+- `$projectSlug` (string)
+- `$result` (`Hyperlinkgroup\Linguist\DTO\SyncResult`)
+
+Example listener:
+
+```php
+use Hyperlinkgroup\Linguist\Events\SyncCompleted;
+use Illuminate\Support\Facades\Event;
+
+Event::listen(SyncCompleted::class, function (SyncCompleted $event): void {
+    logger()->info('Linguist sync completed', [
+        'project' => $event->projectSlug,
+        'keys_processed' => $event->result->keysProcessed,
+    ]);
+});
+```
+
 ## Advanced Usage
 
 ### Using Actions Directly

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Hyperlinkgroup\Linguist\Actions;
 
 use Hyperlinkgroup\Linguist\DTO\SyncResult;
+use Hyperlinkgroup\Linguist\Events\PushCompleted;
 use Hyperlinkgroup\Linguist\Services\LinguistApiClient;
 use Lorisleiva\Actions\Concerns\AsAction;
 
@@ -26,7 +27,8 @@ final class PushTranslations
 		string $projectSlug,
 		bool $overwrite = false,
 		?array $specificLanguages = null,
-		?callable $onProgress = null
+		?callable $onProgress = null,
+		bool $emitEvent = true
 	): SyncResult {
 		$languageResults = [];
 		$errors = [];
@@ -136,13 +138,19 @@ final class PushTranslations
 
 			$successCount = count(array_filter($languageResults, fn ($r) => $r['success']));
 
-			return new SyncResult(
+			$result = new SyncResult(
 				overallSuccess: $successCount === count($languageResults),
 				languageResults: $languageResults,
 				errors: $errors,
 				keysProcessed: $keysProcessed,
 				keysFailed: $keysFailed,
 			);
+
+			if ($emitEvent && $result->overallSuccess) {
+				event(new PushCompleted($projectSlug, $result));
+			}
+
+			return $result;
 
 		} catch (\Exception $e) {
 			return new SyncResult(

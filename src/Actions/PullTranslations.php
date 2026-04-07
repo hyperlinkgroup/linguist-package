@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Hyperlinkgroup\Linguist\Actions;
 
 use Hyperlinkgroup\Linguist\DTO\SyncResult;
+use Hyperlinkgroup\Linguist\Events\PullCompleted;
 use Hyperlinkgroup\Linguist\Exceptions\NoLanguageActivatedException;
 use Hyperlinkgroup\Linguist\Services\LinguistApiClient;
 use Illuminate\Support\Facades\File;
@@ -22,7 +23,7 @@ final class PullTranslations
 	/**
 	 * Pull translations from Linguist and overwrite local files.
 	 */
-	public function handle(string $projectSlug): SyncResult
+	public function handle(string $projectSlug, bool $emitEvent = true): SyncResult
 	{
 		$languageResults = [];
 		$errors = [];
@@ -74,12 +75,18 @@ final class PullTranslations
 
 			$successCount = count(array_filter($languageResults, fn ($r) => $r['success']));
 
-			return new SyncResult(
+			$result = new SyncResult(
 				overallSuccess: $successCount === count($languageResults),
 				languageResults: $languageResults,
 				errors: $errors,
 				keysProcessed: $maxKeysProcessed,
 			);
+
+			if ($emitEvent && $result->overallSuccess) {
+				event(new PullCompleted($projectSlug, $result));
+			}
+
+			return $result;
 
 		} catch (NoLanguageActivatedException $e) {
 			return new SyncResult(
