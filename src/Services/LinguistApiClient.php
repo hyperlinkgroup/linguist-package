@@ -230,7 +230,7 @@ final class LinguistApiClient
 		throw new \RuntimeException('Failed to fetch translation keys count.');
 	}
 
-/**
+	/**
 	 * Count translation keys by downloading language exports.
 	 * This matches what will actually be pulled, unlike countTranslationKeys()
 	 * which uses the list endpoint that may return a different count.

@@ -16,7 +16,8 @@ final class PullTranslations
 
 	public function __construct(
 		private readonly LinguistApiClient $apiClient,
-	) {}
+	) {
+	}
 
 	/**
 	 * Pull translations from Linguist and overwrite local files.
@@ -106,5 +107,4 @@ final class PullTranslations
 			File::delete($legacyPath);
 		}
 	}
-
 }
