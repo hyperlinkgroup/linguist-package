@@ -231,3 +231,102 @@ test('get project language id map falls back to languages endpoint with id and c
 		'DE' => 2,
 	]);
 });
+
+test('list teams requests teams endpoint', function () {
+	Http::preventStrayRequests();
+	Http::fake([
+		'https://api.linguist.eu/v2/teams' => Http::response([
+			'data' => [
+				['id' => 1, 'name' => 'Acme', 'personal_team' => false, 'is_owner' => true],
+			],
+		], 200),
+	]);
+
+	$client = new LinguistApiClient(
+		baseUrl: 'https://api.linguist.eu',
+		token: 'test-token',
+		projectSlug: '',
+	);
+
+	$response = $client->listTeams();
+
+	expect($response->successful())->toBeTrue()
+		->and($response->json('data.0.name'))->toBe('Acme');
+});
+
+test('list supported languages requests account languages endpoint', function () {
+	Http::preventStrayRequests();
+	Http::fake([
+		'https://api.linguist.eu/v2/languages' => Http::response([
+			'data' => [
+				['id' => 10, 'code' => 'en'],
+				['id' => 11, 'locale' => 'de'],
+			],
+		], 200),
+	]);
+
+	$client = new LinguistApiClient(
+		baseUrl: 'https://api.linguist.eu',
+		token: 'test-token',
+		projectSlug: '',
+	);
+
+	$response = $client->listSupportedLanguages();
+
+	expect($response->successful())->toBeTrue()
+		->and($client->supportedLanguageIdMapFromResponse($response))->toBe([
+			'EN' => 10,
+			'DE' => 11,
+		])
+		->and($client->fetchSupportedLanguageIdMap())->toBe([
+			'EN' => 10,
+			'DE' => 11,
+		]);
+});
+
+test('supported language id map from response is empty when request fails', function () {
+	Http::preventStrayRequests();
+	Http::fake([
+		'https://api.linguist.eu/v2/languages' => Http::response([], 403),
+		'https://api.linguist.eu/v2/projects?per_page=100' => Http::response(['data' => []], 200),
+	]);
+
+	$client = new LinguistApiClient(
+		baseUrl: 'https://api.linguist.eu',
+		token: 'test-token',
+		projectSlug: '',
+	);
+
+	expect($client->fetchSupportedLanguageIdMap())->toBe([]);
+});
+
+test('fetch supported language id map merges languages from project list when global languages route is missing', function () {
+	Http::preventStrayRequests();
+	Http::fake([
+		'https://api.linguist.eu/v2/languages' => Http::response([], 404),
+		'https://api.linguist.eu/v2/projects?per_page=100' => Http::response([
+			'data' => [
+				[
+					'slug' => 'existing',
+					'language_id' => 1,
+					'language' => ['id' => 1, 'code' => 'EN'],
+					'languages' => [
+						['id' => 1, 'code' => 'EN'],
+						['id' => 2, 'code' => 'DE'],
+					],
+				],
+			],
+		], 200),
+	]);
+
+	$client = new LinguistApiClient(
+		baseUrl: 'https://api.linguist.eu',
+		token: 'test-token',
+		projectSlug: '',
+	);
+
+	expect($client->fetchSupportedLanguageIdMap())->toBe([
+		'EN' => 1,
+		'DE' => 2,
+	]);
+});

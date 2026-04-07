@@ -12,6 +12,8 @@ use Hyperlinkgroup\Linguist\DTO\SetupInput;
 use Hyperlinkgroup\Linguist\DTO\SyncResult;
 use Illuminate\Support\Collection;
 
+use function Laravel\Prompts\progress;
+
 final class SetupOrchestrator
 {
 	public function __construct(
@@ -34,7 +36,7 @@ final class SetupOrchestrator
 		];
 
 		try {
-			$runtimeClient = $this->clientForToken($input->apiToken);
+			$linguistApiClient = $this->clientForToken($input->apiToken);
 
 			// Step 1: Persist API token config
 			$configResults = PersistLinguistConfig::run([
@@ -51,7 +53,7 @@ final class SetupOrchestrator
 			}
 
 			// Step 2: Determine project
-			$projectSlug = $this->resolveProject($runtimeClient, $input, $results);
+			$projectSlug = $this->resolveProject($linguistApiClient, $input, $results);
 
 			if ($projectSlug === null) {
 				return $results;
@@ -63,16 +65,16 @@ final class SetupOrchestrator
 			PersistLinguistConfig::run(['project' => $projectSlug]);
 
 			// Step 4: Update API client with project
-			$runtimeClient->setProjectSlug($projectSlug);
+			$linguistApiClient->setProjectSlug($projectSlug);
 			$this->apiClient->setProjectSlug($projectSlug);
 
 			// Step 5: Execute sync based on mode
-			$syncResult = $this->executeSync($runtimeClient, $input, $projectSlug);
+			$syncResult = $this->executeSync($linguistApiClient, $input, $projectSlug);
 			$results['sync_result'] = $syncResult;
 
 			// Step 6: Trigger auto-translation if requested
 			if ($input->triggerAutoTranslate && ($syncResult?->overallSuccess ?? false)) {
-				$results['auto_translate'] = $this->triggerAutoTranslate($runtimeClient, $input);
+				$results['auto_translate'] = $this->triggerAutoTranslate($linguistApiClient, $input);
 			}
 
 		} catch (\Exception $e) {
@@ -88,9 +90,16 @@ final class SetupOrchestrator
 	private function resolveProject(LinguistApiClient $runtimeClient, SetupInput $input, array &$results): ?string
 	{
 		if ($input->isNewProject()) {
+			if ($input->newProjectTeamId === null || $input->newProjectTeamId < 1) {
+				$results['errors'][] = 'A team must be selected to create a project.';
+
+				return null;
+			}
+
 			$createData = [
 				'name' => $input->newProjectName,
 				'description' => 'Created via linguist:setup',
+				'team_id' => $input->newProjectTeamId,
 				'language_id' => $input->sourceLanguageId ?? $this->detectSourceLanguageId(),
 				'translation_languages' => $input->targetLanguageIds,
 				'translation_is_active' => true,
@@ -122,17 +131,52 @@ final class SetupOrchestrator
 	/**
 	 * Execute the appropriate sync mode.
 	 */
-	private function executeSync(LinguistApiClient $runtimeClient, SetupInput $input, string $projectSlug): ?SyncResult
+	private function executeSync(LinguistApiClient $linguistApiClient, SetupInput $input, string $projectSlug): ?SyncResult
 	{
+		$onPushProgress = $this->pushProgressCallback();
+
 		return match ($input->syncMode) {
-			'pull' => (new PullTranslations($runtimeClient))->handle($projectSlug),
-			'push' => (new PushTranslations($runtimeClient))->handle($projectSlug),
-			'sync' => (new SyncTranslations($runtimeClient))->handle(
+			'pull' => (new PullTranslations($linguistApiClient))->handle($projectSlug),
+			'push' => (new PushTranslations($linguistApiClient))->handle(
+				projectSlug: $projectSlug,
+				onProgress: $onPushProgress,
+			),
+			'sync' => (new SyncTranslations($linguistApiClient))->handle(
 				projectSlug: $projectSlug,
 				pruneRemoteKeys: $input->pruneRemoteKeys,
 				activateMissingLanguages: $input->activateMissingLanguages,
+				onPushProgress: $onPushProgress,
 			),
 			default => null,
+		};
+	}
+
+	/**
+	 * @return callable(int $current, int $total, string $key): void
+	 */
+	private function pushProgressCallback(): callable
+	{
+		$uploadProgress = null;
+
+		return function (int $current, int $total, string $key) use (&$uploadProgress): void {
+			if ($total <= 0) {
+				return;
+			}
+
+			if ($uploadProgress === null) {
+				$uploadProgress = progress(
+					label: 'Uploading translation keys',
+					steps: $total,
+				);
+				$uploadProgress->start();
+			}
+
+			$uploadProgress->hint("Key: {$key}");
+			$uploadProgress->advance();
+
+			if ($current >= $total) {
+				$uploadProgress->finish();
+			}
 		};
 	}
 

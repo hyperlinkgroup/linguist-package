@@ -70,6 +70,7 @@ test('setup input can be converted to array', function () {
 		'api_token',
 		'project_slug',
 		'new_project_name',
+		'new_project_team_id',
 		'sync_mode',
 		'prune_remote_keys',
 		'activate_missing_languages',
@@ -85,5 +86,6 @@ test('setup input has default values', function () {
 		->and($input->pruneRemoteKeys)->toBeFalse()
 		->and($input->activateMissingLanguages)->toBeTrue()
 		->and($input->triggerAutoTranslate)->toBeFalse()
+		->and($input->newProjectTeamId)->toBeNull()
 		->and($input->targetLanguageIds)->toBe([]);
 });

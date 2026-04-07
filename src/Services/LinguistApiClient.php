@@ -62,6 +62,15 @@ final class LinguistApiClient
 	}
 
 	/**
+	 * List teams the authenticated user can access (owned + memberships).
+	 */
+	public function listTeams(): Response
+	{
+		return $this->getHttp()
+			->get("{$this->baseUrl}/teams");
+	}
+
+	/**
 	 * List all projects accessible to the authenticated user.
 	 */
 	public function listProjects(array $params = []): Response
@@ -79,6 +88,92 @@ final class LinguistApiClient
 	{
 		return $this->getHttp()
 			->post("{$this->baseUrl}/projects", $data);
+	}
+
+	/**
+	 * List languages available on the account (for mapping locale codes to API language IDs).
+	 */
+	public function listSupportedLanguages(): Response
+	{
+		return $this->getHttp()
+			->get("{$this->baseUrl}/languages");
+	}
+
+	/**
+	 * Build uppercase language code => Linguist language id from listSupportedLanguages() response.
+	 *
+	 * @return array<string, int>
+	 */
+	public function supportedLanguageIdMapFromResponse(Response $response): array
+	{
+		if (! $response->successful()) {
+			return [];
+		}
+
+		$map = [];
+
+		foreach ($response->json('data', []) as $item) {
+			if (! is_array($item)) {
+				continue;
+			}
+
+			$code = strtoupper((string) ($item['code'] ?? $item['locale'] ?? ''));
+			$id = $item['id'] ?? null;
+
+			if ($code !== '' && is_numeric($id)) {
+				$map[$code] = (int) $id;
+			}
+		}
+
+		return $map;
+	}
+
+	/**
+	 * Resolve language codes to Linguist language IDs for setup (e.g. creating a project).
+	 *
+	 * Tries GET /languages first when the API provides a global catalog; otherwise merges
+	 * id/code pairs from each project in GET /projects (Linguist v2 exposes languages on
+	 * project resources only — there is no standalone languages index).
+	 *
+	 * @return array<string, int>
+	 */
+	public function fetchSupportedLanguageIdMap(): array
+	{
+		$fromCatalog = $this->supportedLanguageIdMapFromResponse($this->listSupportedLanguages());
+
+		if ($fromCatalog !== []) {
+			return $fromCatalog;
+		}
+
+		return $this->mergeLanguageIdMapsFromProjectsIndex();
+	}
+
+	/**
+	 * Collect code => id from all projects returned by the list endpoint (shared Language rows).
+	 *
+	 * @return array<string, int>
+	 */
+	private function mergeLanguageIdMapsFromProjectsIndex(): array
+	{
+		$response = $this->listProjects(['per_page' => 100]);
+
+		if (! $response->successful()) {
+			return [];
+		}
+
+		$merged = [];
+
+		foreach ($response->json('data', []) as $project) {
+			if (! is_array($project)) {
+				continue;
+			}
+
+			foreach ($this->languageIdMapFromProjectPayload($project) as $code => $id) {
+				$merged[$code] = $id;
+			}
+		}
+
+		return $merged;
 	}
 
 	/**
