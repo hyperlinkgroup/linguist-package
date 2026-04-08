@@ -137,8 +137,12 @@ final class LinguistSetupCommand extends Command
 
 	private function getApiToken(): ?string
 	{
+		$apiTokenSettingsUrl = (string) config('linguist.api_tokens_url');
+		$apiTokenSettingsLink = "Get your API token at {$apiTokenSettingsUrl}";
+
 		$token = password(
 			label: 'Enter your Linguist API token',
+			hint: $apiTokenSettingsLink,
 			required: true
 		);
 

@@ -74,6 +74,13 @@ return [
 
     /*
      |--------------------------------------------------------------------------
+     | Linguist API Token Settings URL
+     |--------------------------------------------------------------------------
+     */
+    'api_tokens_url' => env('LINGUIST_API_TOKENS_URL', 'https://app.linguist.eu/settings/api-tokens'),
+
+    /*
+     |--------------------------------------------------------------------------
      | Temporary Directory for Translations while processing
      |--------------------------------------------------------------------------
      */
@@ -84,6 +91,7 @@ return [
 The setup wizard automatically writes these values to your `.env` file.
 
 `LINGUIST_URL` should point to the versioned API base URL (for example `https://api.your-domain.com/v2`).
+`LINGUIST_API_TOKENS_URL` is the URL opened when users follow the **Linguist API settings** link printed before the token prompt (clickable in terminals that support hyperlinks; otherwise the label is still shown as plain text).
 
 ## Commands
 
