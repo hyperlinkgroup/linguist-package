@@ -23,7 +23,6 @@ class LinguistCommand extends Command
 		{--sync : Force sync mode}
 		{--pull : Force pull mode}
 		{--push : Force push mode}
-		{--prune-remote-keys : Remove remote keys not present locally (sync mode)}
 		{--no-activate-missing-languages : Do not activate missing local languages remotely (sync mode)}
 		{--overwrite : Overwrite existing remote translations (push mode)}
 		{--languages= : Comma-separated language codes for push mode (e.g. EN,DE)}';
@@ -130,7 +129,7 @@ class LinguistCommand extends Command
 
 		return $syncTranslations->handle(
 			projectSlug: $projectSlug,
-			pruneRemoteKeys: (bool) $this->option('prune-remote-keys'),
+			pruneRemoteKeys: true,
 			activateMissingLanguages: ! (bool) $this->option('no-activate-missing-languages'),
 			onPushProgress: function (int $current, int $total, string $key) use (&$uploadProgress): void {
 				if ($uploadProgress === null) {

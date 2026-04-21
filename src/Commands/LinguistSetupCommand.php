@@ -81,16 +81,9 @@ final class LinguistSetupCommand extends Command
 		$syncMode = $this->getSyncMode();
 
 		// Step 5: Mode-specific options
-		$pruneRemoteKeys = false;
+		$pruneRemoteKeys = in_array($syncMode, ['sync', 'push'], true);
 		$activateMissingLanguages = true;
 		$triggerAutoTranslate = false;
-
-		if (in_array($syncMode, ['sync', 'push'], true)) {
-			$pruneRemoteKeys = confirm(
-				'Remove keys from Linguist that are not present in local files?',
-				false
-			);
-		}
 
 		if (in_array($syncMode, ['sync', 'pull'], true)) {
 			$activateMissingLanguages = confirm(

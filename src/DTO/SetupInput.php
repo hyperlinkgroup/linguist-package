@@ -12,7 +12,7 @@ final class SetupInput
 		public readonly ?string $newProjectName = null,
 		public readonly ?int $newProjectTeamId = null,
 		public readonly string $syncMode = 'sync',
-		public readonly bool $pruneRemoteKeys = false,
+		public readonly bool $pruneRemoteKeys = true,
 		public readonly bool $activateMissingLanguages = true,
 		public readonly bool $triggerAutoTranslate = false,
 		public readonly ?int $sourceLanguageId = null,
