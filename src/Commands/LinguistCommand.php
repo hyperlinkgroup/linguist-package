@@ -12,6 +12,7 @@ use Hyperlinkgroup\Linguist\Services\LinguistApiClient;
 use Illuminate\Console\Command;
 use Symfony\Component\Console\Command\Command as SymfonyCommand;
 
+use function Laravel\Prompts\confirm;
 use function Laravel\Prompts\progress;
 use function Laravel\Prompts\select;
 use function Laravel\Prompts\table;
@@ -23,6 +24,7 @@ class LinguistCommand extends Command
 		{--sync : Force sync mode}
 		{--pull : Force pull mode}
 		{--push : Force push mode}
+		{--prune-remote-keys : Remove remote keys not present locally (sync mode)}
 		{--no-activate-missing-languages : Do not activate missing local languages remotely (sync mode)}
 		{--overwrite : Overwrite existing remote translations (push mode)}
 		{--languages= : Comma-separated language codes for push mode (e.g. EN,DE)}';
@@ -127,9 +129,13 @@ class LinguistCommand extends Command
 	{
 		$uploadProgress = null;
 
+		$pruneRemoteKeys = $this->option('prune-remote-keys')
+			? true
+			: confirm('Remove keys from Linguist that are not present in local files?', false);
+
 		return $syncTranslations->handle(
 			projectSlug: $projectSlug,
-			pruneRemoteKeys: true,
+			pruneRemoteKeys: $pruneRemoteKeys,
 			activateMissingLanguages: ! (bool) $this->option('no-activate-missing-languages'),
 			onPushProgress: function (int $current, int $total, string $key) use (&$uploadProgress): void {
 				if ($uploadProgress === null) {
