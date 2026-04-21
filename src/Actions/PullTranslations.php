@@ -45,6 +45,18 @@ final class PullTranslations
 				throw new NoLanguageActivatedException;
 			}
 
+			// Also include the source language, which is not returned by the languages endpoint
+			$projectResponse = $this->apiClient->getProject();
+			if ($projectResponse->successful()) {
+				$sourceLanguage = $projectResponse->json('data.language.code') ?? $projectResponse->json('language.code');
+				if (is_string($sourceLanguage) && $sourceLanguage !== '') {
+					$sourceCode = strtoupper($sourceLanguage);
+					if (! in_array($sourceCode, $languages, true)) {
+						$languages[] = $sourceCode;
+					}
+				}
+			}
+
 			$maxKeysProcessed = 0;
 
 			foreach ($languages as $language) {
