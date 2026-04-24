@@ -226,5 +226,4 @@ final class PushTranslations
 
 		return $keys;
 	}
-
 }
