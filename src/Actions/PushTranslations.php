@@ -15,6 +15,8 @@ final class PushTranslations
 
 	private const BATCH_SIZE = 250;
 
+	private const API_PER_PAGE = 100;
+
 	public function __construct(
 		private readonly LinguistApiClient $apiClient,
 	) {}
@@ -74,6 +76,18 @@ final class PushTranslations
 
 			$totalKeys = count($translationsByKey);
 			$currentKey = 0;
+
+			if (! $overwrite && $translationsByKey !== []) {
+				$existingRemoteKeys = $this->fetchExistingRemoteKeySet();
+
+				$translationsByKey = array_filter(
+					$translationsByKey,
+					static fn (string $key): bool => ! isset($existingRemoteKeys[$key]),
+					ARRAY_FILTER_USE_KEY
+				);
+
+				$totalKeys = count($translationsByKey);
+			}
 
 			$batches = array_chunk($translationsByKey, self::BATCH_SIZE, true);
 
@@ -160,4 +174,57 @@ final class PushTranslations
 			);
 		}
 	}
+
+	/**
+	 * @return array<string, bool>
+	 */
+	private function fetchExistingRemoteKeySet(): array
+	{
+		$keys = [];
+		$page = 1;
+
+		while (true) {
+			$response = $this->apiClient->listTranslationKeys([
+				'per_page' => self::API_PER_PAGE,
+				'page' => $page,
+			]);
+
+			if (! $response->successful()) {
+				break;
+			}
+
+			$data = $response->json('data', []);
+
+			if (! is_array($data) || $data === []) {
+				break;
+			}
+
+			foreach ($data as $item) {
+				if (! is_array($item)) {
+					continue;
+				}
+
+				$key = (string) ($item['key'] ?? '');
+
+				if ($key !== '') {
+					$keys[$key] = true;
+				}
+			}
+
+			$lastPage = $response->json('meta.last_page');
+
+			if (is_numeric($lastPage) && $page >= (int) $lastPage) {
+				break;
+			}
+
+			if (count($data) < self::API_PER_PAGE) {
+				break;
+			}
+
+			$page++;
+		}
+
+		return $keys;
+	}
+
 }

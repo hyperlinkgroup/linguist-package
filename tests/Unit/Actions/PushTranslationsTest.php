@@ -37,6 +37,9 @@ test('push sends one request per unique key with merged language payload', funct
 				],
 			]],
 		], 200),
+		'https://api.linguist.eu/v2/projects/test-project/translation-keys?per_page=100&page=1' => Http::response([
+			'data' => [],
+		], 200),
 		'https://api.linguist.eu/v2/projects/test-project/translation-keys' => Http::response([
 			'data' => ['id' => 1],
 		], 200),
@@ -55,7 +58,7 @@ test('push sends one request per unique key with merged language payload', funct
 		->and($result->keysProcessed)->toBe(2)
 		->and($result->keysFailed)->toBe(0);
 
-	Http::assertSentCount(2);
+	Http::assertSentCount(3);
 
 	Http::assertSent(function (Request $request) {
 		if ($request->url() !== 'https://api.linguist.eu/v2/projects/test-project/translation-keys') {
@@ -91,6 +94,9 @@ test('push reports progress for each uploaded key', function () {
 					['id' => 20, 'code' => 'DE'],
 				],
 			]],
+		], 200),
+		'https://api.linguist.eu/v2/projects/test-project/translation-keys?per_page=100&page=1' => Http::response([
+			'data' => [],
 		], 200),
 		'https://api.linguist.eu/v2/projects/test-project/translation-keys' => Http::response([
 			'data' => ['id' => 1],
@@ -136,6 +142,9 @@ test('push dispatches completion event on success', function () {
 					['id' => 20, 'code' => 'DE'],
 				],
 			]],
+		], 200),
+		'https://api.linguist.eu/v2/projects/test-project/translation-keys?per_page=100&page=1' => Http::response([
+			'data' => [],
 		], 200),
 		'https://api.linguist.eu/v2/projects/test-project/translation-keys' => Http::response([
 			'data' => ['id' => 1],
@@ -183,4 +192,87 @@ test('push does not dispatch completion event on failure', function () {
 	expect($result->overallSuccess)->toBeFalse();
 
 	Event::assertNotDispatched(PushCompleted::class);
+});
+
+test('push skips existing remote keys when overwrite is false', function () {
+	createTestTranslationFiles('test-project', ['EN', 'DE']);
+
+	Http::preventStrayRequests();
+	Http::fake([
+		'https://api.linguist.eu/v2/projects?per_page=100' => Http::response([
+			'data' => [[
+				'slug' => 'test-project',
+				'languages' => [
+					['id' => 10, 'code' => 'EN'],
+					['id' => 20, 'code' => 'DE'],
+				],
+			]],
+		], 200),
+		'https://api.linguist.eu/v2/projects/test-project/translation-keys?per_page=100&page=1' => Http::response([
+			'data' => [
+				['id' => 9, 'key' => 'hello'],
+			],
+		], 200),
+		'https://api.linguist.eu/v2/projects/test-project/translation-keys' => Http::response([
+			'data' => ['id' => 1],
+		], 200),
+	]);
+
+	$client = new LinguistApiClient(
+		baseUrl: 'https://api.linguist.eu',
+		token: 'test-token',
+		projectSlug: 'test-project',
+	);
+
+	$action = new PushTranslations($client);
+	$result = $action->handle('test-project', overwrite: false);
+
+	expect($result->overallSuccess)->toBeTrue()
+		->and($result->keysProcessed)->toBe(1);
+
+	Http::assertSent(function (Request $request): bool {
+		if ($request->url() !== 'https://api.linguist.eu/v2/projects/test-project/translation-keys') {
+			return false;
+		}
+
+		$keys = $request->data()['keys'] ?? [];
+
+		return count($keys) === 1 && ($keys[0]['key'] ?? null) === 'goodbye';
+	});
+});
+
+test('push uploads existing remote keys when overwrite is true', function () {
+	createTestTranslationFiles('test-project', ['EN', 'DE']);
+
+	Http::preventStrayRequests();
+	Http::fake([
+		'https://api.linguist.eu/v2/projects?per_page=100' => Http::response([
+			'data' => [[
+				'slug' => 'test-project',
+				'languages' => [
+					['id' => 10, 'code' => 'EN'],
+					['id' => 20, 'code' => 'DE'],
+				],
+			]],
+		], 200),
+		'https://api.linguist.eu/v2/projects/test-project/translation-keys' => Http::response([
+			'data' => ['id' => 1],
+		], 200),
+	]);
+
+	$client = new LinguistApiClient(
+		baseUrl: 'https://api.linguist.eu',
+		token: 'test-token',
+		projectSlug: 'test-project',
+	);
+
+	$action = new PushTranslations($client);
+	$result = $action->handle('test-project', overwrite: true);
+
+	expect($result->overallSuccess)->toBeTrue()
+		->and($result->keysProcessed)->toBe(2);
+
+	Http::assertNotSent(function (Request $request): bool {
+		return $request->url() === 'https://api.linguist.eu/v2/projects/test-project/translation-keys?per_page=100&page=1';
+	});
 });

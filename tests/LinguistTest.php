@@ -166,6 +166,21 @@ test('that we can execute the command', function () {
 	Http::preventStrayRequests();
 
 	Http::fake([
+		'https://api.linguist.eu/v2/projects?per_page=100' => Http::response([
+			'data' => [[
+				'slug' => 'project',
+				'languages' => [
+					['id' => 10, 'code' => 'EN'],
+					['id' => 20, 'code' => 'DE'],
+				],
+			]],
+		], 200),
+		'https://api.linguist.eu/v2/projects/project/translation-keys?per_page=100&page=1' => Http::response([
+			'data' => [],
+		], 200),
+		'https://api.linguist.eu/v2/projects/project/translation-keys' => Http::response([
+			'data' => [],
+		], 200),
 		'https://api.linguist.eu/v2/projects/project/languages' => Http::response([
 			'data' => $languages->all(),
 		]),
@@ -202,8 +217,29 @@ test('artisan command succeeds with valid configuration', function () {
 	Http::preventStrayRequests();
 
 	Http::fake([
+		'https://api.linguist.eu/v2/projects?per_page=100' => Http::response([
+			'data' => [[
+				'slug' => 'project',
+				'languages' => [
+					['id' => 10, 'code' => 'EN'],
+					['id' => 20, 'code' => 'DE'],
+				],
+			]],
+		], 200),
+		'https://api.linguist.eu/v2/projects/project/translation-keys?per_page=100&page=1' => Http::response([
+			'data' => [],
+		], 200),
+		'https://api.linguist.eu/v2/projects/project/translation-keys' => Http::response([
+			'data' => [],
+		], 200),
 		'https://api.linguist.eu/v2/projects/project/languages' => Http::response([
 			'data' => $languages->all(),
+		]),
+		'https://api.linguist.eu/v2/projects/project' => Http::response([
+			'data' => [
+				'slug' => 'project',
+				'language' => ['code' => 'EN'],
+			],
 		]),
 		'https://api.linguist.eu/v2/projects/project/export/json/DE?prefix=%3A' => Http::response([
 			'url' => 'https://api.linguist.eu/export/dd9d79d3-135e-4f7e-b439-c35024ee0376?project=project&signature=363063c742f891af8dbeb4ac7d1940743ff083cdb0d30bbb736e0e773e694900',
@@ -219,7 +255,7 @@ test('artisan command succeeds with valid configuration', function () {
 		]),
 	]);
 
-	$this->artisan('linguist:sync --mode=sync')
+	$this->artisan('linguist:sync --mode=sync --sync-source=remote --no-interaction')
 		->assertSuccessful()
 		->expectsOutputToContain('Starting linguist sync...')
 		->expectsOutputToContain('Sync completed');

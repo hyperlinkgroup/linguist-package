@@ -144,6 +144,7 @@ final class SetupOrchestrator
 				projectSlug: $projectSlug,
 				pruneRemoteKeys: $input->pruneRemoteKeys,
 				activateMissingLanguages: $input->activateMissingLanguages,
+				syncSource: $input->syncSource,
 				onPushProgress: $onPushProgress,
 			),
 			default => null,

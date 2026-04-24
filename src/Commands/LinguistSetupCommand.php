@@ -79,6 +79,7 @@ final class LinguistSetupCommand extends Command
 
 		// Step 4: Sync mode
 		$syncMode = $this->getSyncMode();
+		$syncSource = $syncMode === 'sync' ? $this->getSyncSource() : 'remote';
 
 		// Step 5: Mode-specific options
 		$pruneRemoteKeys = in_array($syncMode, ['sync', 'push'], true);
@@ -105,6 +106,7 @@ final class LinguistSetupCommand extends Command
 			newProjectName: $projectChoice['type'] === 'new' ? $projectChoice['name'] : null,
 			newProjectTeamId: $projectChoice['type'] === 'new' ? ($projectChoice['team_id'] ?? null) : null,
 			syncMode: $syncMode,
+			syncSource: $syncSource,
 			pruneRemoteKeys: $pruneRemoteKeys,
 			activateMissingLanguages: $activateMissingLanguages,
 			triggerAutoTranslate: $triggerAutoTranslate,
@@ -440,6 +442,18 @@ final class LinguistSetupCommand extends Command
 				'push' => 'Push - Upload local translations to Linguist',
 			],
 			default: 'sync'
+		);
+	}
+
+	private function getSyncSource(): string
+	{
+		return select(
+			label: 'Please choose merge strategy for existing keys',
+			options: [
+				'remote' => 'Remote - Prefer Linguist values',
+				'local' => 'Local - Prefer local values',
+			],
+			default: 'remote'
 		);
 	}
 

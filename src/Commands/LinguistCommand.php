@@ -24,6 +24,7 @@ class LinguistCommand extends Command
 		{--sync : Force sync mode}
 		{--pull : Force pull mode}
 		{--push : Force push mode}
+		{--sync-source= : Existing key source in sync mode: remote, local}
 		{--prune-remote-keys : Remove remote keys not present locally (sync mode)}
 		{--no-activate-missing-languages : Do not activate missing local languages remotely (sync mode)}
 		{--overwrite : Overwrite existing remote translations (push mode)}
@@ -128,6 +129,7 @@ class LinguistCommand extends Command
 	private function runSyncWithProgress(SyncTranslations $syncTranslations, string $projectSlug): SyncResult
 	{
 		$uploadProgress = null;
+		$syncSource = $this->resolveSyncSource();
 
 		$pruneRemoteKeys = $this->option('prune-remote-keys')
 			? true
@@ -137,6 +139,7 @@ class LinguistCommand extends Command
 			projectSlug: $projectSlug,
 			pruneRemoteKeys: $pruneRemoteKeys,
 			activateMissingLanguages: ! (bool) $this->option('no-activate-missing-languages'),
+			syncSource: $syncSource,
 			onPushProgress: function (int $current, int $total, string $key) use (&$uploadProgress): void {
 				if ($uploadProgress === null) {
 					$uploadProgress = progress(
@@ -153,6 +156,35 @@ class LinguistCommand extends Command
 					$uploadProgress->finish();
 				}
 			}
+		);
+	}
+
+	private function resolveSyncSource(): string
+	{
+		$syncSourceOption = strtolower((string) ($this->option('sync-source') ?? ''));
+
+		if (in_array($syncSourceOption, ['remote', 'local'], true)) {
+			return $syncSourceOption;
+		}
+
+		if ($syncSourceOption !== '') {
+			throw new \InvalidArgumentException("Invalid sync source '{$syncSourceOption}'. Allowed: remote, local.");
+		}
+
+		$modeWasProvidedExplicitly = ($this->option('mode') !== null && $this->option('mode') !== '')
+			|| (bool) $this->option('sync');
+
+		if (! $this->input->isInteractive() || $modeWasProvidedExplicitly) {
+			return 'remote';
+		}
+
+		return (string) select(
+			label: 'Please choose merge strategy for existing keys',
+			options: [
+				'remote' => 'Remote - Prefer Linguist values',
+				'local' => 'Local - Prefer local values',
+			],
+			default: 'remote'
 		);
 	}
 

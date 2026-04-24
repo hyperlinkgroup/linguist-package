@@ -28,10 +28,12 @@ final class SyncTranslations
 		string $projectSlug,
 		bool $pruneRemoteKeys = false,
 		bool $activateMissingLanguages = true,
+		string $syncSource = 'remote',
 		?callable $onPushProgress = null
 	): SyncResult {
 		try {
 			$this->apiClient->setProjectSlug($projectSlug);
+			$normalizedSyncSource = strtolower($syncSource) === 'local' ? 'local' : 'remote';
 			[$uploadLanguages, $preLanguageResults, $preErrors] = $this->resolveUploadPlan($projectSlug, $activateMissingLanguages);
 
 			$preKeysProcessed = 0;
@@ -49,7 +51,7 @@ final class SyncTranslations
 				? new SyncResult(overallSuccess: true)
 				: (new PushTranslations($this->apiClient))->handle(
 					projectSlug: $projectSlug,
-					overwrite: false,
+					overwrite: $normalizedSyncSource === 'local',
 					specificLanguages: $uploadLanguages,
 					onProgress: $onPushProgress,
 					emitEvent: false,
