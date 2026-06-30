@@ -94,8 +94,6 @@ final class LinguistSetupCommand extends Command
 		$activateMissingLanguages = ! (bool) $this->option('no-activate-missing-languages')
 			&& confirm('Activate languages that exist locally but not in the Linguist project?', true);
 
-		$triggerAutoTranslate = false;
-
 		// Check if auto-translation is available
 		$triggerAutoTranslate = confirm(
 			'Trigger automatic translation of all keys? (requires DeepL API key)',
