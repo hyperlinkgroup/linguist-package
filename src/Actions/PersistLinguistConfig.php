@@ -100,8 +100,8 @@ final class PersistLinguistConfig
 	 */
 	public static function hasValidConfig(): bool
 	{
-		return config('linguist.project') !== ''
-			&& config('linguist.token') !== '';
+		return filled(config('linguist.project'))
+			&& filled(config('linguist.token'));
 	}
 
 	/**
