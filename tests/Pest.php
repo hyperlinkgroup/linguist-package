@@ -4,7 +4,6 @@ use Hyperlinkgroup\Linguist\Tests\TestCase;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Http;
 
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class)->in('Feature');
 uses(TestCase::class)->in('.');
 
 /**
@@ -90,10 +89,8 @@ function createTestTranslationFiles(string $project, array $languages = ['EN', '
 	File::ensureDirectoryExists(lang_path());
 
 	foreach ($languages as $language) {
-		File::ensureDirectoryExists(lang_path(strtoupper($language)));
-
 		File::put(
-			lang_path(strtoupper($language) . "/{$project}.json"),
+			lang_path(strtolower($language) . '.json'),
 			json_encode([
 				'hello' => "Hello in {$language}",
 				'goodbye' => "Goodbye in {$language}",

@@ -14,6 +14,9 @@ afterEach(function () {
 test('pull counts processed keys from downloaded translation files', function () {
 	Http::preventStrayRequests();
 	Http::fake([
+		'https://api.linguist.eu/v2/projects/test-project' => Http::response([
+			'data' => ['language' => ['code' => 'EN']],
+		], 200),
 		'https://api.linguist.eu/v2/projects/test-project/languages' => Http::response([
 			'data' => ['EN', 'DE'],
 		], 200),
@@ -50,6 +53,9 @@ test('pull counts processed keys from downloaded translation files', function ()
 test('pull supports language objects from languages endpoint', function () {
 	Http::preventStrayRequests();
 	Http::fake([
+		'https://api.linguist.eu/v2/projects/test-project' => Http::response([
+			'data' => ['language' => ['code' => 'EN']],
+		], 200),
 		'https://api.linguist.eu/v2/projects/test-project/languages' => Http::response([
 			'data' => [
 				['id' => 1, 'code' => 'en'],
@@ -87,6 +93,9 @@ test('pull supports language objects from languages endpoint', function () {
 test('pull reports processed keys using largest successful language payload', function () {
 	Http::preventStrayRequests();
 	Http::fake([
+		'https://api.linguist.eu/v2/projects/test-project' => Http::response([
+			'data' => ['language' => ['code' => 'EN']],
+		], 200),
 		'https://api.linguist.eu/v2/projects/test-project/languages' => Http::response([
 			'data' => ['EN', 'DE'],
 		], 200),
@@ -122,6 +131,9 @@ test('pull reports processed keys using largest successful language payload', fu
 test('pull retries export download without prefix when prefixed export is empty', function () {
 	Http::preventStrayRequests();
 	Http::fake([
+		'https://api.linguist.eu/v2/projects/test-project' => Http::response([
+			'data' => ['language' => ['code' => 'EN']],
+		], 200),
 		'https://api.linguist.eu/v2/projects/test-project/languages' => Http::response([
 			'data' => ['EN'],
 		], 200),
@@ -155,6 +167,9 @@ test('pull retries export download without prefix when prefixed export is empty'
 test('pull writes lowercase laravel locale json files', function () {
 	Http::preventStrayRequests();
 	Http::fake([
+		'https://api.linguist.eu/v2/projects/test-project' => Http::response([
+			'data' => ['language' => ['code' => 'EN']],
+		], 200),
 		'https://api.linguist.eu/v2/projects/test-project/languages' => Http::response([
 			'data' => ['EN', 'DE'],
 		], 200),
@@ -194,6 +209,9 @@ test('pull removes existing legacy managed language file', function () {
 
 	Http::preventStrayRequests();
 	Http::fake([
+		'https://api.linguist.eu/v2/projects/test-project' => Http::response([
+			'data' => ['language' => ['code' => 'DE']],
+		], 200),
 		'https://api.linguist.eu/v2/projects/test-project/languages' => Http::response([
 			'data' => ['DE'],
 		], 200),
@@ -222,6 +240,9 @@ test('pull removes existing legacy managed language file', function () {
 test('pull dispatches completion event on success', function () {
 	Http::preventStrayRequests();
 	Http::fake([
+		'https://api.linguist.eu/v2/projects/test-project' => Http::response([
+			'data' => ['language' => ['code' => 'EN']],
+		], 200),
 		'https://api.linguist.eu/v2/projects/test-project/languages' => Http::response([
 			'data' => ['EN'],
 		], 200),
