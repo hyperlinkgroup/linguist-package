@@ -40,10 +40,6 @@ This wizard will guide you through:
    - **Push**: Upload local translations to Linguist
 4. **Options** - Configure setup preferences and optional auto-translation
 
-### Interactive Only
-
-`linguist:setup` now runs as an interactive wizard and prompts for all setup values during execution.
-
 ## Configuration
 
 The published config file (`config/linguist.php`):
@@ -101,6 +97,7 @@ The setup wizard automatically writes these values to your `.env` file.
 
 `LINGUIST_URL` should point to the versioned API base URL (for example `https://api.your-domain.com/v2`).
 `LINGUIST_API_TOKENS_URL` is the URL opened when users follow the **Linguist API settings** link printed before the token prompt (clickable in terminals that support hyperlinks; otherwise the label is still shown as plain text).
+`LINGUIST_PULL_MINIFIED` controls whether pulled translation files are written as minified JSON. Defaults to `false` (pretty-printed).
 
 ## Commands
 
@@ -131,15 +128,17 @@ Mode-specific options:
 # sync mode options
 php artisan linguist:sync --sync --prune-remote-keys
 php artisan linguist:sync --sync --no-activate-missing-languages
+php artisan linguist:sync --sync --sync-source=local
+php artisan linguist:sync --sync --sync-source=remote
 
 # push mode options
 php artisan linguist:sync --push --overwrite
 php artisan linguist:sync --push --languages=EN,DE
 ```
 
-`--prune-remote-keys` now deletes remote keys that no longer exist locally before upload.
-`--no-activate-missing-languages` now skips uploading local languages that are not active in the remote project.
-If missing-language activation is enabled (default), sync attempts to activate them before upload when resolvable from project metadata.
+`--prune-remote-keys` deletes remote keys that no longer exist locally before upload (sync mode).
+`--no-activate-missing-languages` skips activating local languages that are not yet active in the remote project. Applies to all modes. If omitted, the command prompts interactively or activates automatically in non-interactive contexts.
+`--sync-source` controls which side wins for existing keys in sync mode: `remote` (default) keeps the remote value, `local` overwrites with the local value.
 
 ## Sync Modes
 
@@ -222,6 +221,7 @@ The package provides typed DTOs for configuration:
 
 ```php
 use Hyperlinkgroup\Linguist\DTO\SetupInput;
+use Hyperlinkgroup\Linguist\DTO\SetupResult;
 use Hyperlinkgroup\Linguist\DTO\SyncResult;
 
 $input = new SetupInput(
@@ -238,6 +238,15 @@ $input = SetupInput::fromArray([
     'project_slug' => 'my-project',
 ]);
 
+// Setup results
+$setupResult = app(\Hyperlinkgroup\Linguist\Services\SetupOrchestrator::class)->execute($input);
+$setupResult->configPersisted;  // bool
+$setupResult->projectCreated;   // bool
+$setupResult->projectSlug;      // ?string
+$setupResult->syncResult;       // ?SyncResult
+$setupResult->autoTranslate;    // bool
+$setupResult->hasErrors();      // bool
+
 // Sync results
 $result = SyncTranslations::run(projectSlug: 'my-project');
 $result->overallSuccess; // bool
@@ -246,7 +255,7 @@ $result->getFailedLanguages(); // array
 $result->getSummaryMessage(); // string
 ```
 
-## Error Handling and Reporting
+### Error Handling and Reporting
 
 All sync operations return detailed `SyncResult` objects with:
 
@@ -267,6 +276,24 @@ Per-language results:
   ✗ FR: Failed to download translations
 ```
 
+## API Endpoints
+
+The package communicates with Linguist's REST API (`/v2`):
+
+- `GET /v2/projects` - List available projects
+- `POST /v2/projects` - Create new project
+- `GET /v2/projects/{project}` - Get project details (including source language)
+- `PATCH /v2/projects/{project}` - Update project
+- `GET /v2/projects/{project}/languages` - List project languages
+- `GET /v2/projects/{project}/export/json/{language}` - Get export URL
+- `GET /v2/projects/{project}/translation-keys` - List translation keys
+- `POST /v2/projects/{project}/translation-keys` - Create/update key
+- `PATCH /v2/projects/{project}/translation-keys/{key}` - Update key
+- `DELETE /v2/projects/{project}/translation-keys/{key}` - Delete key
+- `POST /v2/projects/{project}/translate` - Trigger auto-translation
+
+All endpoints require Bearer token authentication.
+
 ## Testing
 
 ```bash
@@ -279,23 +306,6 @@ The test suite includes:
 - DTO validation tests
 - Legacy integration tests
 - HTTP mocking for API interactions
-
-## API Endpoints
-
-The package communicates with Linguist's REST API (`/v2`):
-
-- `GET /v2/projects` - List available projects
-- `POST /v2/projects` - Create new project
-- `PATCH /v2/projects/{project}` - Update project
-- `GET /v2/projects/{project}/languages` - List project languages
-- `GET /v2/projects/{project}/export/json/{language}` - Get export URL
-- `GET /v2/projects/{project}/translation-keys` - List translation keys
-- `POST /v2/projects/{project}/translation-keys` - Create/update key
-- `PATCH /v2/projects/{project}/translation-keys/{key}` - Update key
-- `DELETE /v2/projects/{project}/translation-keys/{key}` - Delete key
-- `POST /v2/projects/{project}/translate` - Trigger auto-translation
-
-All endpoints require Bearer token authentication.
 
 ## License
 
