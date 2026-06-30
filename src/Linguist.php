@@ -5,11 +5,9 @@ namespace Hyperlinkgroup\Linguist;
 use Hyperlinkgroup\Linguist\Exceptions\ConfigBrokenException;
 use Hyperlinkgroup\Linguist\Exceptions\NoLanguageActivatedException;
 use Illuminate\Http\Client\PendingRequest;
-use Illuminate\Http\Client\Response;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Http;
-use Illuminate\Support\Str;
 
 class Linguist
 {
@@ -36,11 +34,11 @@ class Linguist
 	public function handle(): void
 	{
 		// check if the project and the token are set
-		if (! $this->isProjectSet()) {
+		if ($this->project === '') {
 			throw new ConfigBrokenException('The linguist project is not available');
 		}
 
-		if (! $this->isTokenSet()) {
+		if ($this->token === '') {
 			throw new ConfigBrokenException('The linguist token is not available');
 		}
 
@@ -57,55 +55,30 @@ class Linguist
 		$this->moveFiles();
 	}
 
-	private function getTemporaryDirectory(): string
+	protected function getBaseUrl(): string
 	{
-		if ($this->temporaryDirectory) {
-			return $this->temporaryDirectory;
-		}
+		$configuredUrl = (string) (config('linguist.url') ?? 'https://api.linguist.eu/v2');
+		$baseUrl = $this->normalizeBaseUrl($configuredUrl);
 
-		return config('linguist.temporary_directory') ?? 'tmp/translations';
+		return $baseUrl . "/projects/$this->project";
 	}
 
-	private function getProject(): string
+	private function normalizeBaseUrl(string $baseUrl): string
 	{
-		if ($this->project) {
-			return $this->project;
+		$normalizedBaseUrl = rtrim($baseUrl, '/');
+
+		if (preg_match('#/v\d+$#', $normalizedBaseUrl) === 1) {
+			return $normalizedBaseUrl;
 		}
 
-		return config('linguist.project');
-	}
-
-	private function getToken(): string
-	{
-		if ($this->token) {
-			return $this->token;
-		}
-
-		return config('linguist.token');
+		return $normalizedBaseUrl . '/v2';
 	}
 
 	protected function getHttp(): PendingRequest
 	{
-		$url = Str::of(config('linguist.url') ?? 'https://api.linguist.eu/');
-		if ($url->endsWith('/')) {
-			$url = $url->substr(0, -1);
-		}
-
-		$project = $this->getProject();
-
-		return Http::baseUrl($url . "/projects/$project")
+		return Http::baseUrl($this->getBaseUrl())
 			->acceptJson()
-			->withToken($this->getToken());
-	}
-
-	protected function isProjectSet(): bool
-	{
-		return $this->getProject() !== '';
-	}
-
-	protected function isTokenSet(): bool
-	{
-		return $this->getToken() !== '';
+			->withToken($this->token);
 	}
 
 	/**
@@ -119,7 +92,7 @@ class Linguist
 		$this->languages = collect($response->json('data'));
 
 		if ($this->languages->isEmpty()) {
-			throw new NoLanguageActivatedException();
+			throw new NoLanguageActivatedException;
 		}
 	}
 
@@ -156,22 +129,8 @@ class Linguist
 
 	protected function ensureDirectoriesExist(): void
 	{
-		$paths = collect();
-
-		$this->languages->each(function ($language) use (&$paths) {
-			$paths->push(lang_path($language));
-		});
-
-		$paths->push(storage_path($this->getTemporaryDirectory()));
-
-		$paths->each(function ($path) {
-			File::ensureDirectoryExists($path);
-		});
-	}
-
-	public function start(): self
-	{
-		return $this;
+		File::ensureDirectoryExists(lang_path());
+		File::ensureDirectoryExists(storage_path($this->temporaryDirectory));
 	}
 
 	public function createDirectories(): self
@@ -186,37 +145,67 @@ class Linguist
 	 */
 	public function downloadFiles(): self
 	{
-		$routes = [];
+		$routes = $this->fetchExportRoutes();
 
-		// get download routes for each language
-		$this->languages->each(function ($language) use (&$routes) {
-			$upperCaseLanguage = strtoupper($language);
-
-			/** @var Response $response */
-			$response = $this->getHttp()
-				->get("export/json/$upperCaseLanguage?prefix=:");
-
-			if ($response->failed()) {
-				return;
-			}
-
-			$routes[$language] = $response->json('url');
-		});
-
-		// download files
-		foreach ($routes as $language => $route) {
-			if (! $route) {
-				continue;
-			}
-
-			/** @var Response $response */
-			$response = $this->getHttp()
-				->get($route);
-
-			File::put(storage_path($this->getTemporaryDirectory() . "/$language.json"), $response->body());
-		}
+		$this->downloadTranslationFiles($routes);
 
 		return $this;
+	}
+
+	/**
+	 * Fetch export URLs for all languages concurrently.
+	 *
+	 * @return array<string, string>
+	 */
+	protected function fetchExportRoutes(): array
+	{
+		$baseUrl = $this->getBaseUrl();
+
+		$responses = Http::pool(function ($pool) use ($baseUrl) {
+			$this->languages->each(function ($language) use ($pool, $baseUrl) {
+				$upperCaseLanguage = strtoupper($language);
+				$pool->as($language)
+					->acceptJson()
+					->withToken($this->token)
+					->get("$baseUrl/export/json/$upperCaseLanguage?prefix=%3A");
+			});
+		});
+
+		$routes = [];
+
+		foreach ($responses as $language => $response) {
+			if ($response->successful()) {
+				$routes[$language] = $response->json('url');
+			}
+		}
+
+		return $routes;
+	}
+
+	/**
+	 * Download translation files from the provided routes concurrently.
+	 *
+	 * @param  array<string, string>  $routes
+	 */
+	protected function downloadTranslationFiles(array $routes): void
+	{
+		if ($routes === []) {
+			return;
+		}
+
+		$responses = Http::pool(function ($pool) use ($routes) {
+			foreach ($routes as $language => $url) {
+				$pool->as($language)
+					->withToken($this->token)
+					->get($url);
+			}
+		});
+
+		foreach ($responses as $language => $response) {
+			if ($response->successful()) {
+				File::put(storage_path($this->temporaryDirectory . "/$language.json"), $response->body());
+			}
+		}
 	}
 
 	/**
@@ -224,16 +213,21 @@ class Linguist
 	 */
 	public function moveFiles(): self
 	{
-		$files = File::files(storage_path($this->getTemporaryDirectory()));
+		$files = File::files(storage_path($this->temporaryDirectory));
 
 		foreach ($files as $file) {
 			$language = $file->getFilenameWithoutExtension();
-			$destination = lang_path("$language/$this->project.json");
+			$destination = lang_path(strtolower($language) . '.json');
 
 			File::move($file, $destination);
+
+			$legacyPath = lang_path(strtoupper($language) . "/{$this->project}.json");
+			if (File::exists($legacyPath)) {
+				File::delete($legacyPath);
+			}
 		}
 
-		File::deleteDirectory(storage_path($this->getTemporaryDirectory()));
+		File::deleteDirectory(storage_path($this->temporaryDirectory));
 
 		return $this;
 	}

@@ -1,0 +1,132 @@
+<?php
+
+declare(strict_types=1);
+
+namespace Hyperlinkgroup\Linguist\Actions;
+
+use Hyperlinkgroup\Linguist\DTO\SyncResult;
+use Hyperlinkgroup\Linguist\Events\PullCompleted;
+use Hyperlinkgroup\Linguist\Exceptions\NoLanguageActivatedException;
+use Hyperlinkgroup\Linguist\Services\LinguistApiClient;
+use Illuminate\Support\Facades\File;
+use Lorisleiva\Actions\Concerns\AsAction;
+
+final class PullTranslations
+{
+	use AsAction;
+
+	public function __construct(
+		private readonly LinguistApiClient $apiClient,
+	) {}
+
+	/**
+	 * Pull translations from Linguist and overwrite local files.
+	 */
+	public function handle(string $projectSlug, bool $emitEvent = true): SyncResult
+	{
+		$languageResults = [];
+		$errors = [];
+
+		try {
+			$this->apiClient->setProjectSlug($projectSlug);
+
+			$languagesResponse = $this->apiClient->getLanguages();
+
+			if (! $languagesResponse->successful()) {
+				return new SyncResult(
+					overallSuccess: false,
+					errors: ['Failed to fetch languages: ' . $languagesResponse->body()],
+				);
+			}
+
+			$languages = $this->apiClient->extractLanguageCodes($languagesResponse->json('data', []));
+
+			if ($languages === []) {
+				throw new NoLanguageActivatedException;
+			}
+
+			// Also include the source language, which is not returned by the languages endpoint
+			$projectResponse = $this->apiClient->getProject();
+			if ($projectResponse->successful()) {
+				$sourceLanguage = $projectResponse->json('data.language.code') ?? $projectResponse->json('language.code');
+				if (is_string($sourceLanguage) && $sourceLanguage !== '') {
+					$sourceCode = strtoupper($sourceLanguage);
+					if (! in_array($sourceCode, $languages, true)) {
+						$languages[] = $sourceCode;
+					}
+				}
+			}
+
+			$maxKeysProcessed = 0;
+
+			foreach ($languages as $language) {
+				$result = $this->apiClient->downloadLanguageExportWithPrefixFallback($language);
+
+				if ($result['success']) {
+					$languageResults[$language] = ['success' => true];
+
+					$body = $result['body'] ?? null;
+					if (is_string($body) && $body !== '') {
+						$decoded = json_decode($body, true);
+						if (is_array($decoded)) {
+							$maxKeysProcessed = max($maxKeysProcessed, count(array_keys($decoded)));
+						}
+
+						$this->writeDownloadedTranslations($language, $body);
+					}
+				} else {
+					$message = $result['message'] ?? 'Failed to fetch export URL for this language.';
+					$languageResults[$language] = [
+						'success' => false,
+						'message' => $message,
+					];
+					$errors[] = "{$language}: {$message}";
+				}
+			}
+
+			$successCount = count(array_filter($languageResults, fn ($r) => $r['success']));
+
+			$result = new SyncResult(
+				overallSuccess: $successCount === count($languageResults),
+				languageResults: $languageResults,
+				errors: $errors,
+				keysProcessed: $maxKeysProcessed,
+			);
+
+			if ($emitEvent && $result->overallSuccess) {
+				event(new PullCompleted($projectSlug, $result));
+			}
+
+			return $result;
+
+		} catch (NoLanguageActivatedException $e) {
+			return new SyncResult(
+				overallSuccess: false,
+				errors: ['No languages are activated in your Linguist project.'],
+			);
+		} catch (\Exception $e) {
+			return new SyncResult(
+				overallSuccess: false,
+				errors: [$e->getMessage()],
+			);
+		}
+	}
+
+	private function writeDownloadedTranslations(string $language, string $body): void
+	{
+		File::ensureDirectoryExists(lang_path());
+
+		$normalizedLanguage = strtolower($language);
+		$decoded = json_decode($body, true) ?? [];
+		$flags = config('linguist.pull_minified', false)
+			? JSON_UNESCAPED_UNICODE
+			: JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE;
+		File::put(lang_path("{$normalizedLanguage}.json"), json_encode($decoded, $flags) . "\n");
+
+		// Cleanup legacy managed file format (lang/DE/linguist.json) to avoid stale overrides.
+		$legacyPath = lang_path(strtoupper($language) . '/linguist.json');
+		if (File::exists($legacyPath)) {
+			File::delete($legacyPath);
+		}
+	}
+}
