@@ -21,7 +21,8 @@ use function Laravel\Prompts\text;
 
 final class LinguistSetupCommand extends Command
 {
-	protected $signature = 'linguist:setup';
+	protected $signature = 'linguist:setup
+		{--prune-remote-keys : Remove remote keys not present locally (skips confirmation prompt)}';
 
 	protected $description = 'Interactive wizard to set up Linguist integration';
 
@@ -82,7 +83,12 @@ final class LinguistSetupCommand extends Command
 		$syncSource = $syncMode === 'sync' ? $this->getSyncSource() : 'remote';
 
 		// Step 5: Mode-specific options
-		$pruneRemoteKeys = in_array($syncMode, ['sync', 'push'], true);
+		$pruneRemoteKeys = false;
+		if (in_array($syncMode, ['sync', 'push'], true)) {
+			$pruneRemoteKeys = $this->option('prune-remote-keys')
+				|| confirm('Remove remote keys that are not present in local files?', false);
+		}
+
 		$activateMissingLanguages = true;
 		$triggerAutoTranslate = false;
 
