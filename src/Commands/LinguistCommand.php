@@ -131,9 +131,8 @@ class LinguistCommand extends Command
 		$uploadProgress = null;
 		$syncSource = $this->resolveSyncSource();
 
-		$pruneRemoteKeys = $this->option('prune-remote-keys')
-			? true
-			: confirm('Remove keys from Linguist that are not present in local files?', false);
+		$pruneRemoteKeys = (bool) $this->option('prune-remote-keys')
+			|| ($this->input->isInteractive() && confirm('Remove keys from Linguist that are not present in local files?', false));
 
 		return $syncTranslations->handle(
 			projectSlug: $projectSlug,
