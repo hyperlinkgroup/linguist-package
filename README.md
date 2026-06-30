@@ -16,7 +16,7 @@ You can install the package via composer:
 composer require hyperlinkgroup/linguist
 ```
 
-You can publish the config file with:
+You can optionally publish the config file with:
 
 ```bash
 php artisan vendor:publish --tag="linguist-config"
@@ -84,6 +84,16 @@ return [
      |--------------------------------------------------------------------------
      */
     'temporary_directory' => 'tmp/translations',
+
+    /*
+     |--------------------------------------------------------------------------
+     | Pull Minified
+     |--------------------------------------------------------------------------
+     | When enabled, pulled translation files are written as minified JSON.
+     | By default, files are pretty-printed for readability and easier diffing.
+     |--------------------------------------------------------------------------
+     */
+    'pull_minified' => env('LINGUIST_PULL_MINIFIED', false),
 ];
 ```
 
@@ -110,7 +120,7 @@ If run interactively, the command prompts for mode selection (same choices as se
 For scheduler/non-interactive execution, the command defaults to `sync` mode unless you pass an explicit mode flag:
 
 ```bash
-php artisan linguist:sync --mode=sync
+php artisan linguist:sync --sync
 php artisan linguist:sync --pull
 php artisan linguist:sync --push
 ```

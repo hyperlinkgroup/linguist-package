@@ -35,4 +35,14 @@ return [
 	 |--------------------------------------------------------------------------
 	 */
 	'temporary_directory' => 'tmp/translations',
+
+	/*
+	 |--------------------------------------------------------------------------
+	 | Pull Minified
+	 |--------------------------------------------------------------------------
+	 | When enabled, pulled translation files are written as minified JSON.
+	 | By default, files are pretty-printed for readability and easier diffing.
+	 |--------------------------------------------------------------------------
+	 */
+	'pull_minified' => env('LINGUIST_PULL_MINIFIED', false),
 ];

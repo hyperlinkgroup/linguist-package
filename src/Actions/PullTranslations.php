@@ -117,7 +117,11 @@ final class PullTranslations
 		File::ensureDirectoryExists(lang_path());
 
 		$normalizedLanguage = strtolower($language);
-		File::put(lang_path("{$normalizedLanguage}.json"), $body);
+		$decoded = json_decode($body, true) ?? [];
+		$flags = config('linguist.pull_minified', false)
+			? JSON_UNESCAPED_UNICODE
+			: JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE;
+		File::put(lang_path("{$normalizedLanguage}.json"), json_encode($decoded, $flags) . "\n");
 
 		// Cleanup legacy managed file format (lang/DE/linguist.json) to avoid stale overrides.
 		$legacyPath = lang_path(strtoupper($language) . '/linguist.json');
