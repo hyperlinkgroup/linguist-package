@@ -127,7 +127,7 @@ final class PushTranslations
 				}
 
 				foreach ($batch as $key => $translationsForKey) {
-					$keysFailed += count($translationsForKey);
+					$keysFailed++;
 
 					foreach (array_unique($keyLanguages[(string) $key] ?? []) as $language) {
 						$languageErrors[$language][] = "Failed to store key '{$key}' in batch upload.";
