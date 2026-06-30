@@ -7,41 +7,13 @@ use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Http;
 
-use function PHPUnit\Framework\assertFileDoesNotExist;
-use function PHPUnit\Framework\assertFileExists;
-
 beforeEach(function () {
-	cleanUp();
+	cleanTranslationFiles();
 });
 
 afterEach(function () {
-	cleanUp();
+	cleanTranslationFiles();
 });
-
-function cleanUp(): void
-{
-	if (File::exists(lang_path())) {
-		collect(File::files(lang_path()))->each(function (SplFileInfo $file) {
-			File::delete($file->getPathname());
-		});
-
-		File::deleteDirectory(lang_path());
-	}
-
-	if (File::exists(storage_path('tmp/translations'))) {
-		collect(File::files(storage_path('tmp/translations')))->each(function (SplFileInfo $file) {
-			File::delete($file->getPathname());
-		});
-	}
-
-	if (File::exists(storage_path('tmp'))) {
-		collect(File::files(storage_path('tmp')))->each(function (SplFileInfo $file) {
-			File::delete($file->getPathname());
-		});
-	}
-
-	File::deleteDirectory(storage_path('tmp'));
-}
 
 test('that we get an exception when project is not set', function () {
 	config(['linguist.project' => '']);
@@ -99,9 +71,8 @@ test('that we can create directories', function () {
 	Linguist::setLanguages($languages)
 		->createDirectories();
 
-	assertFileExists(lang_path());
-
-	assertFileExists(storage_path(config('linguist.temporary_directory')));
+	expect(File::exists(lang_path()))->toBeTrue()
+		->and(File::exists(storage_path(config('linguist.temporary_directory'))))->toBeTrue();
 });
 
 test('that we can download the files', function () {
@@ -113,13 +84,13 @@ test('that we can download the files', function () {
 	Http::preventStrayRequests();
 
 	Http::fake([
-		'https://api.linguist.eu/v2/projects/project/export/json/DE?prefix=:' => Http::response([
+		'https://api.linguist.eu/v2/projects/project/export/json/DE?prefix=%3A' => Http::response([
 			'url' => 'https://api.linguist.eu/export/dd9d79d3-135e-4f7e-b439-c35024ee0376?project=project&signature=363063c742f891af8dbeb4ac7d1940743ff083cdb0d30bbb736e0e773e694900',
 		]),
 		'https://api.linguist.eu/export/dd9d79d3-135e-4f7e-b439-c35024ee0376?project=project&signature=363063c742f891af8dbeb4ac7d1940743ff083cdb0d30bbb736e0e773e694900' => Http::response([
 			'Test' => 'Test German Translation',
 		]),
-		'https://api.linguist.eu/v2/projects/project/export/json/EN?prefix=:' => Http::response([
+		'https://api.linguist.eu/v2/projects/project/export/json/EN?prefix=%3A' => Http::response([
 			'url' => 'https://api.linguist.eu/export/18682c32-2615-447e-8bdf-a4069a7bc8f2?project=project&signature=363063c742f891af8dbeb4ac7d1940743ff083cdb0d30bbb736e0e773e694900',
 		]),
 		'https://api.linguist.eu/export/18682c32-2615-447e-8bdf-a4069a7bc8f2?project=project&signature=363063c742f891af8dbeb4ac7d1940743ff083cdb0d30bbb736e0e773e694900' => Http::response([
@@ -132,7 +103,7 @@ test('that we can download the files', function () {
 		->downloadFiles();
 
 	$languages->each(function (string $language) {
-		assertFileExists(storage_path(config('linguist.temporary_directory') . "/$language.json"));
+		expect(File::exists(storage_path(config('linguist.temporary_directory') . "/$language.json")))->toBeTrue();
 	});
 });
 
@@ -150,10 +121,10 @@ test('that we can move the files', function () {
 	Linguist::moveFiles();
 
 	$languages->each(function (string $language) {
-		assertFileExists(lang_path(strtolower($language) . '.json'));
+		expect(File::exists(lang_path(strtolower($language) . '.json')))->toBeTrue();
 	});
 
-	assertFileDoesNotExist(storage_path(config('linguist.temporary_directory')));
+	expect(File::exists(storage_path(config('linguist.temporary_directory'))))->toBeFalse();
 });
 
 test('that we can execute the command', function () {
@@ -184,13 +155,13 @@ test('that we can execute the command', function () {
 		'https://api.linguist.eu/v2/projects/project/languages' => Http::response([
 			'data' => $languages->all(),
 		]),
-		'https://api.linguist.eu/v2/projects/project/export/json/DE?prefix=:' => Http::response([
+		'https://api.linguist.eu/v2/projects/project/export/json/DE?prefix=%3A' => Http::response([
 			'url' => 'https://api.linguist.eu/export/dd9d79d3-135e-4f7e-b439-c35024ee0376?project=project&signature=363063c742f891af8dbeb4ac7d1940743ff083cdb0d30bbb736e0e773e694900',
 		]),
 		'https://api.linguist.eu/export/dd9d79d3-135e-4f7e-b439-c35024ee0376?project=project&signature=363063c742f891af8dbeb4ac7d1940743ff083cdb0d30bbb736e0e773e694900' => Http::response([
 			'Test' => 'Test German Translation',
 		]),
-		'https://api.linguist.eu/v2/projects/project/export/json/EN?prefix=:' => Http::response([
+		'https://api.linguist.eu/v2/projects/project/export/json/EN?prefix=%3A' => Http::response([
 			'url' => 'https://api.linguist.eu/export/18682c32-2615-447e-8bdf-a4069a7bc8f2?project=project&signature=363063c742f891af8dbeb4ac7d1940743ff083cdb0d30bbb736e0e773e694900',
 		]),
 		'https://api.linguist.eu/export/18682c32-2615-447e-8bdf-a4069a7bc8f2?project=project&signature=363063c742f891af8dbeb4ac7d1940743ff083cdb0d30bbb736e0e773e694900' => Http::response([
@@ -201,10 +172,10 @@ test('that we can execute the command', function () {
 	Linguist::handle();
 
 	$languages->each(function (string $language) {
-		assertFileExists(lang_path(strtolower($language) . '.json'));
+		expect(File::exists(lang_path(strtolower($language) . '.json')))->toBeTrue();
 	});
 
-	assertFileDoesNotExist(storage_path(config('linguist.temporary_directory')));
+	expect(File::exists(storage_path(config('linguist.temporary_directory'))))->toBeFalse();
 });
 
 test('artisan command succeeds with valid configuration', function () {
@@ -261,7 +232,7 @@ test('artisan command succeeds with valid configuration', function () {
 		->expectsOutputToContain('Sync completed');
 
 	$languages->each(function (string $language) {
-		assertFileExists(lang_path(strtolower($language) . '.json'));
+		expect(File::exists(lang_path(strtolower($language) . '.json')))->toBeTrue();
 	});
 });
 

@@ -167,7 +167,7 @@ class Linguist
 				$pool->as($language)
 					->acceptJson()
 					->withToken($this->token)
-					->get("$baseUrl/export/json/$upperCaseLanguage?prefix=:");
+					->get("$baseUrl/export/json/$upperCaseLanguage?prefix=%3A");
 			});
 		});
 

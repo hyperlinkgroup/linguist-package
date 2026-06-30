@@ -122,6 +122,14 @@ php artisan linguist:sync --pull
 php artisan linguist:sync --push
 ```
 
+Alternatively, use the `--mode` option:
+
+```bash
+php artisan linguist:sync --mode=sync
+php artisan linguist:sync --mode=pull
+php artisan linguist:sync --mode=push
+```
+
 Mode-specific options:
 
 ```bash

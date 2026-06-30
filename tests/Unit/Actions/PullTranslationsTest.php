@@ -273,6 +273,68 @@ test('pull dispatches completion event on success', function () {
 	});
 });
 
+test('pull writes pretty-printed json by default', function () {
+	Http::preventStrayRequests();
+	Http::fake([
+		'https://api.linguist.eu/v2/projects/test-project' => Http::response([
+			'data' => ['language' => ['code' => 'EN']],
+		], 200),
+		'https://api.linguist.eu/v2/projects/test-project/languages' => Http::response([
+			'data' => ['EN'],
+		], 200),
+		'https://api.linguist.eu/v2/projects/test-project/export/json/EN?prefix=%3A' => Http::response([
+			'url' => 'https://api.linguist.eu/export/en',
+		], 200),
+		'https://api.linguist.eu/export/en' => Http::response([
+			'hello' => 'Hello',
+		], 200),
+	]);
+
+	$client = new LinguistApiClient(
+		baseUrl: 'https://api.linguist.eu',
+		token: 'test-token',
+		projectSlug: 'test-project',
+	);
+
+	$action = new PullTranslations($client);
+	$action->handle('test-project');
+
+	$content = File::get(lang_path('en.json'));
+	expect($content)->toContain("\n");
+});
+
+test('pull writes minified json when pull_minified is enabled', function () {
+	config(['linguist.pull_minified' => true]);
+
+	Http::preventStrayRequests();
+	Http::fake([
+		'https://api.linguist.eu/v2/projects/test-project' => Http::response([
+			'data' => ['language' => ['code' => 'EN']],
+		], 200),
+		'https://api.linguist.eu/v2/projects/test-project/languages' => Http::response([
+			'data' => ['EN'],
+		], 200),
+		'https://api.linguist.eu/v2/projects/test-project/export/json/EN?prefix=%3A' => Http::response([
+			'url' => 'https://api.linguist.eu/export/en',
+		], 200),
+		'https://api.linguist.eu/export/en' => Http::response([
+			'hello' => 'Hello',
+		], 200),
+	]);
+
+	$client = new LinguistApiClient(
+		baseUrl: 'https://api.linguist.eu',
+		token: 'test-token',
+		projectSlug: 'test-project',
+	);
+
+	$action = new PullTranslations($client);
+	$action->handle('test-project');
+
+	$content = File::get(lang_path('en.json'));
+	expect(trim($content))->toBe('{"hello":"Hello"}');
+});
+
 test('pull does not dispatch completion event on failure', function () {
 	Http::preventStrayRequests();
 	Http::fake([
