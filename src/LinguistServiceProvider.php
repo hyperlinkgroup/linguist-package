@@ -35,8 +35,8 @@ class LinguistServiceProvider extends PackageServiceProvider
 			return new Linguist;
 		});
 
-		// Register API Client
-		$this->app->singleton(LinguistApiClient::class, function () {
+		// Register API Client as transient — setProjectSlug() mutates instance state
+		$this->app->bind(LinguistApiClient::class, function () {
 			return new LinguistApiClient(
 				baseUrl: config('linguist.url', 'https://api.linguist.eu/v2'),
 				token: config('linguist.token', ''),
@@ -44,12 +44,14 @@ class LinguistServiceProvider extends PackageServiceProvider
 			);
 		});
 
-		// Register Actions as singletons
+		// Stateless actions can be singletons
 		$this->app->singleton(PersistLinguistConfig::class);
 		$this->app->singleton(CollectLocalTranslations::class);
-		$this->app->singleton(PullTranslations::class);
-		$this->app->singleton(PushTranslations::class);
-		$this->app->singleton(SyncTranslations::class);
+
+		// Stateful actions (hold a LinguistApiClient reference) must be transient
+		$this->app->bind(PullTranslations::class);
+		$this->app->bind(PushTranslations::class);
+		$this->app->bind(SyncTranslations::class);
 	}
 
 	public function boot(): void
