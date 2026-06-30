@@ -83,7 +83,6 @@ final class SetupOrchestrator
 			if ($input->triggerAutoTranslate && ($syncResult?->overallSuccess ?? false)) {
 				$autoTranslate = $this->triggerAutoTranslate(
 					runtimeClient: $linguistApiClient,
-					input: $input
 				);
 			}
 
@@ -202,7 +201,7 @@ final class SetupOrchestrator
 	/**
 	 * Trigger auto-translation for the project.
 	 */
-	private function triggerAutoTranslate(LinguistApiClient $runtimeClient, SetupInput $input): bool
+	private function triggerAutoTranslate(LinguistApiClient $runtimeClient): bool
 	{
 		$options = [
 			'overwrite_automatic_translations' => false,
