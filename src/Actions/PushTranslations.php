@@ -69,7 +69,7 @@ final class PushTranslations
 				}
 
 				foreach ($translations as $key => $text) {
-					$translationsByKey[$key][$languageId] = $text;
+					$translationsByKey[$key][$languageId] = $this->convertToLinguistVariableFormat($text);
 					$keyLanguages[$key][] = $language;
 				}
 			}
@@ -173,6 +173,11 @@ final class PushTranslations
 				keysFailed: $keysFailed,
 			);
 		}
+	}
+
+	private function convertToLinguistVariableFormat(string $text): string
+	{
+		return preg_replace('/:([a-zA-Z_][a-zA-Z0-9_]*)/', '{{ $1 }}', $text) ?? $text;
 	}
 
 	/**

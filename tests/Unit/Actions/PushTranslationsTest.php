@@ -194,6 +194,58 @@ test('push does not dispatch completion event on failure', function () {
 	Event::assertNotDispatched(PushCompleted::class);
 });
 
+test('push converts laravel variable syntax to linguist format', function () {
+	File::ensureDirectoryExists(lang_path());
+	File::put(lang_path('en.json'), json_encode([
+		'welcome' => 'Welcome, :name!',
+		'count' => 'You have :count messages',
+		'no_var' => 'No variables here',
+	], JSON_PRETTY_PRINT));
+
+	Http::preventStrayRequests();
+	Http::fake([
+		'https://api.linguist.eu/v2/projects?per_page=100' => Http::response([
+			'data' => [[
+				'slug' => 'test-project',
+				'languages' => [
+					['id' => 10, 'code' => 'EN'],
+				],
+			]],
+		], 200),
+		'https://api.linguist.eu/v2/projects/test-project/translation-keys?per_page=100&page=1' => Http::response([
+			'data' => [],
+		], 200),
+		'https://api.linguist.eu/v2/projects/test-project/translation-keys' => Http::response([
+			'data' => ['id' => 1],
+		], 200),
+	]);
+
+	$client = new LinguistApiClient(
+		baseUrl: 'https://api.linguist.eu',
+		token: 'test-token',
+		projectSlug: 'test-project',
+	);
+
+	$action = new PushTranslations($client);
+	$action->handle('test-project');
+
+	Http::assertSent(function (Request $request): bool {
+		if ($request->url() !== 'https://api.linguist.eu/v2/projects/test-project/translation-keys') {
+			return false;
+		}
+
+		$keys = collect($request->data()['keys'] ?? []);
+
+		$welcome = $keys->firstWhere('key', 'welcome');
+		$count = $keys->firstWhere('key', 'count');
+		$noVar = $keys->firstWhere('key', 'no_var');
+
+		return $welcome['translations'][10] === 'Welcome, {{ name }}!'
+			&& $count['translations'][10] === 'You have {{ count }} messages'
+			&& $noVar['translations'][10] === 'No variables here';
+	});
+});
+
 test('push skips existing remote keys when overwrite is false', function () {
 	createTestTranslationFiles('test-project', ['EN', 'DE']);
 
