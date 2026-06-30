@@ -9,6 +9,7 @@ use Hyperlinkgroup\Linguist\Actions\PullTranslations;
 use Hyperlinkgroup\Linguist\Actions\PushTranslations;
 use Hyperlinkgroup\Linguist\Actions\SyncTranslations;
 use Hyperlinkgroup\Linguist\DTO\SetupInput;
+use Hyperlinkgroup\Linguist\DTO\SetupResult;
 use Hyperlinkgroup\Linguist\DTO\SyncResult;
 use Illuminate\Support\Collection;
 
@@ -20,19 +21,14 @@ final class SetupOrchestrator
 		private readonly LinguistApiClient $apiClient,
 	) {}
 
-	/**
-	 * Execute the full setup flow.
-	 */
-	public function execute(SetupInput $input): array
+	public function execute(SetupInput $input): SetupResult
 	{
-		$results = [
-			'config_persisted' => false,
-			'project_created' => false,
-			'project_slug' => null,
-			'sync_result' => null,
-			'auto_translate' => false,
-			'errors' => [],
-		];
+		$configPersisted = false;
+		$projectCreated = false;
+		$projectSlug = null;
+		$syncResult = null;
+		$autoTranslate = false;
+		$errors = [];
 
 		try {
 			$linguistApiClient = $this->clientForToken($input->apiToken);
@@ -43,22 +39,31 @@ final class SetupOrchestrator
 				'url' => config('linguist.url', 'https://api.linguist.eu/v2'),
 			]);
 
-			$results['config_persisted'] = $configResults['token'] ?? false;
+			$configPersisted = $configResults['token'] ?? false;
 
-			if (! $results['config_persisted']) {
-				$results['errors'][] = 'Failed to persist API token configuration.';
+			if (! $configPersisted) {
+				$errors[] = 'Failed to persist API token configuration.';
 
-				return $results;
+				return new SetupResult(
+					configPersisted: false,
+					errors: $errors,
+				);
 			}
 
 			// Step 2: Determine project
-			$projectSlug = $this->resolveProject($linguistApiClient, $input, $results);
+			$projectSlug = $this->resolveProject(
+				runtimeClient: $linguistApiClient,
+				input: $input,
+				projectCreated: $projectCreated,
+				errors: $errors
+			);
 
 			if ($projectSlug === null) {
-				return $results;
+				return new SetupResult(
+					configPersisted: $configPersisted,
+					errors: $errors,
+				);
 			}
-
-			$results['project_slug'] = $projectSlug;
 
 			// Step 3: Persist project slug to config
 			PersistLinguistConfig::run(['project' => $projectSlug]);
@@ -68,29 +73,43 @@ final class SetupOrchestrator
 			$this->apiClient->setProjectSlug($projectSlug);
 
 			// Step 5: Execute sync based on mode
-			$syncResult = $this->executeSync($linguistApiClient, $input, $projectSlug);
-			$results['sync_result'] = $syncResult;
+			$syncResult = $this->executeSync(
+				linguistApiClient: $linguistApiClient,
+				input: $input,
+				projectSlug: $projectSlug
+			);
 
 			// Step 6: Trigger auto-translation if requested
 			if ($input->triggerAutoTranslate && ($syncResult?->overallSuccess ?? false)) {
-				$results['auto_translate'] = $this->triggerAutoTranslate($linguistApiClient, $input);
+				$autoTranslate = $this->triggerAutoTranslate(
+					runtimeClient: $linguistApiClient,
+					input: $input
+				);
 			}
 
 		} catch (\Exception $e) {
-			$results['errors'][] = $e->getMessage();
+			$errors[] = $e->getMessage();
 		}
 
-		return $results;
+		return new SetupResult(
+			configPersisted: $configPersisted,
+			projectCreated: $projectCreated,
+			projectSlug: $projectSlug,
+			syncResult: $syncResult,
+			autoTranslate: $autoTranslate,
+			errors: $errors,
+		);
 	}
 
-	/**
-	 * Resolve project (create new or use existing).
-	 */
-	private function resolveProject(LinguistApiClient $runtimeClient, SetupInput $input, array &$results): ?string
-	{
+	private function resolveProject(
+		LinguistApiClient $runtimeClient,
+		SetupInput $input,
+		bool &$projectCreated,
+		array &$errors,
+	): ?string {
 		if ($input->isNewProject()) {
 			if ($input->newProjectTeamId === null || $input->newProjectTeamId < 1) {
-				$results['errors'][] = 'A team must be selected to create a project.';
+				$errors[] = 'A team must be selected to create a project.';
 
 				return null;
 			}
@@ -107,13 +126,13 @@ final class SetupOrchestrator
 			$response = $runtimeClient->createProject($createData);
 
 			if (! $response->successful()) {
-				$results['errors'][] = 'Failed to create project: ' . $response->body();
+				$errors[] = 'Failed to create project: ' . $response->body();
 
 				return null;
 			}
 
 			$projectData = $response->json('data');
-			$results['project_created'] = true;
+			$projectCreated = true;
 
 			return $projectData['slug'] ?? null;
 		}
@@ -122,7 +141,7 @@ final class SetupOrchestrator
 			return $input->projectSlug;
 		}
 
-		$results['errors'][] = 'No project specified (neither new nor existing).';
+		$errors[] = 'No project specified (neither new nor existing).';
 
 		return null;
 	}

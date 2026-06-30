@@ -7,6 +7,7 @@ namespace Hyperlinkgroup\Linguist\Commands;
 use Hyperlinkgroup\Linguist\Actions\CollectLocalTranslations;
 use Hyperlinkgroup\Linguist\Actions\PersistLinguistConfig;
 use Hyperlinkgroup\Linguist\DTO\SetupInput;
+use Hyperlinkgroup\Linguist\DTO\SetupResult;
 use Hyperlinkgroup\Linguist\Services\LinguistApiClient;
 use Hyperlinkgroup\Linguist\Services\SetupOrchestrator;
 use Illuminate\Console\Command;
@@ -507,12 +508,12 @@ final class LinguistSetupCommand extends Command
 		return 'none (' . implode('; ', CollectLocalTranslations::translationFileSearchRootIssues()) . ')';
 	}
 
-	private function reportResults(array $results): int
+	private function reportResults(SetupResult $results): int
 	{
 		$this->components->info('Setup summary');
 
 		// Config persistence
-		if ($results['config_persisted']) {
+		if ($results->configPersisted) {
 			$this->components->twoColumnDetail('Configuration', 'Saved');
 		} else {
 			$this->components->twoColumnDetail('Configuration', 'Incomplete');
@@ -520,17 +521,17 @@ final class LinguistSetupCommand extends Command
 		}
 
 		// Project info
-		if ($results['project_created']) {
-			$this->components->twoColumnDetail('Project', "{$results['project_slug']} (created)");
-		} elseif ($results['project_slug'] !== null) {
-			$this->components->twoColumnDetail('Project', "{$results['project_slug']} (existing)");
+		if ($results->projectCreated) {
+			$this->components->twoColumnDetail('Project', "{$results->projectSlug} (created)");
+		} elseif ($results->projectSlug !== null) {
+			$this->components->twoColumnDetail('Project', "{$results->projectSlug} (existing)");
 		}
 
 		$this->newLine();
 
 		// Sync results
-		if ($results['sync_result'] !== null) {
-			$syncResult = $results['sync_result'];
+		if ($results->syncResult !== null) {
+			$syncResult = $results->syncResult;
 
 			$this->components->info('Sync results');
 			$this->components->twoColumnDetail('Summary', $syncResult->getSummaryMessage());
@@ -570,16 +571,16 @@ final class LinguistSetupCommand extends Command
 		}
 
 		// Auto-translate
-		if ($results['auto_translate']) {
+		if ($results->autoTranslate) {
 			$this->components->twoColumnDetail('Auto-translation', 'Dispatched');
 		}
 
 		// Errors
-		if (! empty($results['errors'])) {
+		if ($results->hasErrors()) {
 			$this->newLine();
 			$this->components->error('Errors encountered');
 
-			foreach ($results['errors'] as $error) {
+			foreach ($results->errors as $error) {
 				$this->line("  - {$error}");
 			}
 
