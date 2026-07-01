@@ -80,7 +80,7 @@ final class SetupOrchestrator
 			);
 
 			// Step 6: Trigger auto-translation if requested
-			if ($input->triggerAutoTranslate && ($syncResult?->overallSuccess ?? false)) {
+			if ($input->triggerAutoTranslate && $syncResult !== null && $syncResult->overallSuccess) {
 				$autoTranslate = $this->triggerAutoTranslate(
 					runtimeClient: $linguistApiClient,
 				);

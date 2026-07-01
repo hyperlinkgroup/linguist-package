@@ -117,7 +117,7 @@ class Linguist
 
 		$this->getAllLanguages();
 
-		return $this->languages ?? collect();
+		return $this->languages;
 	}
 
 	public function setLanguages(Collection $languages): self

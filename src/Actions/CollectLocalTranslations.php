@@ -133,7 +133,7 @@ final class CollectLocalTranslations
 	{
 		$primary = lang_path();
 
-		if (is_string($primary) && $primary !== '' && File::isDirectory($primary)) {
+		if (filled($primary) && File::isDirectory($primary)) {
 			return [$primary];
 		}
 
@@ -167,7 +167,7 @@ final class CollectLocalTranslations
 				$filenameWithoutExtension = $file->getFilenameWithoutExtension();
 				$isLinguistFile = strtolower($file->getFilename()) === self::LINGUIST_FILENAME;
 				$pathSegments = explode(DIRECTORY_SEPARATOR, $relativePath);
-				$topLevelSegment = $pathSegments[0] ?? '';
+				$topLevelSegment = $pathSegments[0];
 
 				$language = $isLinguistFile
 					? basename($file->getPath())
