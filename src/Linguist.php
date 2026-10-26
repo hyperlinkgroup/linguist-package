@@ -3,7 +3,12 @@
 namespace Hyperlinkgroup\Linguist;
 
 use Hyperlinkgroup\Linguist\Exceptions\ConfigBrokenException;
+use Hyperlinkgroup\Linguist\Exceptions\InvalidLanguageCodeException;
+use Hyperlinkgroup\Linguist\Exceptions\InvalidTranslationFileException;
 use Hyperlinkgroup\Linguist\Exceptions\NoLanguageActivatedException;
+use Hyperlinkgroup\Linguist\Exceptions\TranslationFileWriteException;
+use Hyperlinkgroup\Linguist\Services\LanguageFileWriter;
+use Hyperlinkgroup\Linguist\Support\LanguageCode;
 use Illuminate\Http\Client\PendingRequest;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\File;
@@ -89,7 +94,13 @@ class Linguist
 		$response = $this->getHttp()
 			->get('languages');
 
-		$this->languages = collect($response->json('data'));
+		// The endpoint returns either plain codes or language objects.
+		$this->languages = collect($response->json('data'))
+			->map(static fn (mixed $language): mixed => is_array($language) ? ($language['code'] ?? $language['locale'] ?? null) : $language)
+			->map(static fn (mixed $language): string => is_scalar($language) ? (string) $language : '')
+			->filter(static fn (string $language): bool => $language !== '')
+			->unique()
+			->values();
 
 		if ($this->languages->isEmpty()) {
 			throw new NoLanguageActivatedException;
@@ -163,6 +174,12 @@ class Linguist
 
 		$responses = Http::pool(function ($pool) use ($baseUrl) {
 			$this->languages->each(function ($language) use ($pool, $baseUrl) {
+				if (! LanguageCode::isValid((string) $language)) {
+					report(new InvalidLanguageCodeException("Invalid language code '{$language}'."));
+
+					return;
+				}
+
 				$upperCaseLanguage = strtoupper($language);
 				$pool->as($language)
 					->acceptJson()
@@ -214,20 +231,30 @@ class Linguist
 	public function moveFiles(): self
 	{
 		$files = File::files(storage_path($this->temporaryDirectory));
+		$writer = new LanguageFileWriter;
 
-		foreach ($files as $file) {
-			$language = $file->getFilenameWithoutExtension();
-			$destination = lang_path(strtolower($language) . '.json');
+		$writeFailure = null;
 
-			File::move($file, $destination);
-
-			$legacyPath = lang_path(strtoupper($language) . "/{$this->project}.json");
-			if (File::exists($legacyPath)) {
-				File::delete($legacyPath);
+		try {
+			foreach ($files as $file) {
+				try {
+					$writer->write($file->getFilenameWithoutExtension(), $file->getContents(), "{$this->project}.json");
+				} catch (InvalidTranslationFileException $e) {
+					// Keep the existing language file when the download is unusable, but leave a trace.
+					report($e);
+				} catch (TranslationFileWriteException $e) {
+					// Write the other languages first, then pass the failure on.
+					$writeFailure ??= $e;
+				}
 			}
-		}
 
-		File::deleteDirectory(storage_path($this->temporaryDirectory));
+			if ($writeFailure !== null) {
+				throw $writeFailure;
+			}
+		} finally {
+			// Leftover downloads would be written again by the next run.
+			File::deleteDirectory(storage_path($this->temporaryDirectory));
+		}
 
 		return $this;
 	}

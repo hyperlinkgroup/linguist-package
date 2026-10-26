@@ -210,3 +210,16 @@ test('action can be run as an invokable', function () {
 
 	expect($translations)->toHaveKey('EN');
 });
+
+test('unreadable files are reported per language', function () {
+	File::ensureDirectoryExists(lang_path());
+	File::put(lang_path('de.json'), '{"hello": "Hallo",}');
+	File::put(lang_path('fr.json'), '"just a string"');
+	File::put(lang_path('en.json'), '{"hello": "Hello"}');
+	File::put(lang_path('es.json'), '');
+
+	expect(CollectLocalTranslations::findUnreadableFiles('test-project'))->toBe([
+		'DE' => [lang_path('de.json')],
+		'FR' => [lang_path('fr.json')],
+	]);
+});

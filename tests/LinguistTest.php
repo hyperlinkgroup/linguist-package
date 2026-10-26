@@ -1,9 +1,13 @@
 <?php
 
 use Hyperlinkgroup\Linguist\Exceptions\ConfigBrokenException;
+use Hyperlinkgroup\Linguist\Exceptions\InvalidLanguageCodeException;
+use Hyperlinkgroup\Linguist\Exceptions\InvalidTranslationFileException;
 use Hyperlinkgroup\Linguist\Exceptions\NoLanguageActivatedException;
+use Hyperlinkgroup\Linguist\Exceptions\TranslationFileWriteException;
 use Hyperlinkgroup\Linguist\Facades\Linguist;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Exceptions;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Http;
 
@@ -47,6 +51,27 @@ test('that we can get all languages', function () {
 		->toHaveCount(2)
 		->toContain('EN')
 		->toContain('DE');
+});
+
+test('that we can get all languages from language objects', function () {
+	config(['linguist.project' => 'project']);
+	config(['linguist.token' => 'token']);
+
+	Http::preventStrayRequests();
+
+	Http::fake([
+		'https://api.linguist.eu/v2/projects/project/languages' => Http::response([
+			'data' => [
+				['id' => 1, 'code' => 'EN'],
+				['id' => 2, 'locale' => 'DE'],
+				['id' => 3],
+				['id' => 4, 'code' => ['unexpected']],
+				['id' => 5, 'code' => 'EN'],
+			],
+		]),
+	]);
+
+	expect(Linguist::getLanguages()->all())->toBe(['EN', 'DE']);
 });
 
 test('that we get an exception while getting all languages if the list is empty', function () {
@@ -125,6 +150,67 @@ test('that we can move the files', function () {
 	});
 
 	expect(File::exists(storage_path(config('linguist.temporary_directory'))))->toBeFalse();
+});
+
+test('downloading files reports and skips invalid language codes', function () {
+	config(['linguist.temporary_directory' => 'tmp/translations']);
+	config(['linguist.project' => 'project']);
+
+	Exceptions::fake();
+	Http::preventStrayRequests();
+	Http::fake();
+
+	Linguist::setLanguages(collect(['../x']))
+		->createDirectories()
+		->downloadFiles();
+
+	Http::assertNothingSent();
+	Exceptions::assertReported(fn (InvalidLanguageCodeException $e): bool => $e->getMessage() === "Invalid language code '../x'.");
+});
+
+test('moving files keeps the existing language file when the download is unusable', function () {
+	config(['linguist.temporary_directory' => 'tmp/translations']);
+	config(['linguist.project' => 'project']);
+
+	Linguist::setLanguages(collect(['DE']))
+		->createDirectories();
+
+	Exceptions::fake();
+
+	File::put(lang_path('de.json'), '{"Test": "Bestehende Übersetzung"}');
+	File::put(storage_path('tmp/translations/DE.json'), '<html><body>Bad Gateway</body></html>');
+	File::put(storage_path('tmp/translations/de x.json'), json_encode(['Test' => 'Kein Sprachcode']));
+
+	Linguist::moveFiles();
+
+	expect(File::get(lang_path('de.json')))->toBe('{"Test": "Bestehende Übersetzung"}')
+		->and(File::exists(lang_path('de x.json')))->toBeFalse()
+		->and(File::exists(storage_path(config('linguist.temporary_directory'))))->toBeFalse();
+
+	Exceptions::assertReported(fn (InvalidTranslationFileException $e): bool => $e->getMessage() === "Downloaded translations for 'DE' are not a JSON object.");
+	Exceptions::assertReported(fn (InvalidLanguageCodeException $e): bool => $e->getMessage() === "Invalid language code 'de x'.");
+});
+
+test('moving files writes the other languages, passes write failures on and removes the temporary directory', function () {
+	config(['linguist.temporary_directory' => 'tmp/translations']);
+	config(['linguist.project' => 'project']);
+
+	Linguist::setLanguages(collect(['DE']))
+		->createDirectories();
+
+	File::put(storage_path('tmp/translations/DE.json'), json_encode(['Test' => 'Neu']));
+	File::put(storage_path('tmp/translations/EN.json'), json_encode(['Test' => 'New']));
+	// A directory where the language file should be makes the rename fail.
+	File::ensureDirectoryExists(lang_path('de.json'));
+
+	expect(fn () => Linguist::moveFiles())
+		->toThrow(TranslationFileWriteException::class, "Could not write '" . lang_path('de.json') . "'.");
+
+	expect(File::exists(storage_path('tmp/translations')))->toBeFalse()
+		->and(json_decode(File::get(lang_path('en.json')), true))->toBe(['Test' => 'New'])
+		->and(array_map(fn (SplFileInfo $file): string => $file->getFilename(), File::files(lang_path())))->toBe(['en.json']);
+
+	File::deleteDirectory(lang_path('de.json'));
 });
 
 test('that we can execute the command', function () {

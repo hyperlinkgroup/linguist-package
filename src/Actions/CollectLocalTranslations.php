@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Hyperlinkgroup\Linguist\Actions;
 
+use Hyperlinkgroup\Linguist\Support\LanguageCode;
 use Illuminate\Support\Facades\File;
 use Lorisleiva\Actions\Concerns\AsAction;
 
@@ -55,18 +56,52 @@ final class CollectLocalTranslations
 	 */
 	public static function parseTranslationFile(string $path): array
 	{
+		return self::flattenTranslations(self::decodeTranslationFile($path) ?? []);
+	}
+
+	/**
+	 * Local files that exist but cannot be read as a JSON translation catalog, grouped by language.
+	 *
+	 * Such a language looks empty to the push, so a pull would replace the file and lose its content.
+	 *
+	 * @return array<string, array<int, string>> Language => file paths
+	 */
+	public static function findUnreadableFiles(?string $projectSlug = null): array
+	{
+		$unreadable = [];
+
+		foreach (self::discoverTranslationFiles() as $discoveredFile) {
+			if (! self::shouldIncludeForProjectSlug($discoveredFile, $projectSlug)) {
+				continue;
+			}
+
+			if (self::decodeTranslationFile($discoveredFile['path']) === null) {
+				$unreadable[$discoveredFile['language']][] = $discoveredFile['path'];
+			}
+		}
+
+		return $unreadable;
+	}
+
+	/**
+	 * @return array<mixed>|null Null when the file exists but is not a JSON object or array
+	 */
+	private static function decodeTranslationFile(string $path): ?array
+	{
 		if (! File::exists($path)) {
 			return [];
 		}
 
 		$content = File::get($path);
-		$decoded = json_decode($content, true);
 
-		if (json_last_error() !== JSON_ERROR_NONE || ! is_array($decoded)) {
+		// An empty file holds nothing that could be lost.
+		if (trim($content) === '') {
 			return [];
 		}
 
-		return self::flattenTranslations($decoded);
+		$decoded = json_decode($content, true);
+
+		return is_array($decoded) ? $decoded : null;
 	}
 
 	/**
@@ -171,7 +206,7 @@ final class CollectLocalTranslations
 
 				$language = $isLinguistFile
 					? basename($file->getPath())
-					: (self::isLanguageCodeLike($topLevelSegment) ? $topLevelSegment : $filenameWithoutExtension);
+					: (LanguageCode::isValid($topLevelSegment) ? $topLevelSegment : $filenameWithoutExtension);
 
 				if ($isLinguistFile && $file->getPath() === $langPath) {
 					continue;
@@ -194,14 +229,6 @@ final class CollectLocalTranslations
 	}
 
 	/**
-	 * Determine whether a path segment looks like a locale/language code.
-	 */
-	private static function isLanguageCodeLike(string $segment): bool
-	{
-		return (bool) preg_match('/^[A-Za-z]{2,3}(?:[_-][A-Za-z0-9]{2,8})*$/', $segment);
-	}
-
-	/**
 	 * @param  array{language: string, path: string, filename_without_extension: string, is_linguist_file: bool}  $discoveredFile
 	 */
 	private static function shouldIncludeForProjectSlug(array $discoveredFile, ?string $projectSlug): bool
@@ -215,7 +242,7 @@ final class CollectLocalTranslations
 		}
 
 		// Allow locale-style files like lang/en.json or lang/de.json in sync mode.
-		return self::isLanguageCodeLike($discoveredFile['filename_without_extension']);
+		return LanguageCode::isValid($discoveredFile['filename_without_extension']);
 	}
 
 	/**

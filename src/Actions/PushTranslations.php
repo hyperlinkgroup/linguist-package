@@ -56,9 +56,17 @@ final class PushTranslations
 			$keyLanguages = [];
 			$languageErrors = [];
 			$languageIdMap = $this->apiClient->getProjectLanguageIdMap();
+			$unreadableFiles = CollectLocalTranslations::findUnreadableFiles($projectSlug);
 
 			foreach ($localTranslations as $language => $translations) {
 				$languageErrors[$language] = [];
+
+				// Keys in a broken file never reach the server, so the language must not count as pushed.
+				foreach ($unreadableFiles[$language] ?? [] as $path) {
+					$message = "Local file '{$path}' is not valid JSON.";
+					$languageErrors[$language][] = $message;
+					$errors[] = "{$language}: {$message}";
+				}
 				$languageId = $languageIdMap[strtoupper($language)] ?? null;
 
 				if (! is_int($languageId)) {
@@ -171,6 +179,7 @@ final class PushTranslations
 				errors: [$e->getMessage()],
 				keysProcessed: $keysProcessed,
 				keysFailed: $keysFailed,
+				aborted: true,
 			);
 		}
 	}

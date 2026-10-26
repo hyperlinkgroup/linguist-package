@@ -6,9 +6,12 @@ namespace Hyperlinkgroup\Linguist\Actions;
 
 use Hyperlinkgroup\Linguist\DTO\SyncResult;
 use Hyperlinkgroup\Linguist\Events\PullCompleted;
+use Hyperlinkgroup\Linguist\Exceptions\InvalidTranslationFileException;
 use Hyperlinkgroup\Linguist\Exceptions\NoLanguageActivatedException;
+use Hyperlinkgroup\Linguist\Exceptions\TranslationFileWriteException;
+use Hyperlinkgroup\Linguist\Services\LanguageFileWriter;
 use Hyperlinkgroup\Linguist\Services\LinguistApiClient;
-use Illuminate\Support\Facades\File;
+use Hyperlinkgroup\Linguist\Support\LanguageCode;
 use Lorisleiva\Actions\Concerns\AsAction;
 
 final class PullTranslations
@@ -21,8 +24,12 @@ final class PullTranslations
 
 	/**
 	 * Pull translations from Linguist and overwrite local files.
+	 *
+	 * @param  array<string>  $skipLanguages  Languages to leave untouched locally and report as failed (e.g. because their push failed)
+	 * @param  array<string>  $keepLanguages  Languages to leave untouched locally on purpose (e.g. upload skipped by option).
+	 *                                        Only relevant when the languages endpoint lists a language the project's ID map lacks.
 	 */
-	public function handle(string $projectSlug, bool $emitEvent = true): SyncResult
+	public function handle(string $projectSlug, bool $emitEvent = true, array $skipLanguages = [], array $keepLanguages = []): SyncResult
 	{
 		$languageResults = [];
 		$errors = [];
@@ -58,29 +65,50 @@ final class PullTranslations
 			}
 
 			$maxKeysProcessed = 0;
+			$skippedLanguages = array_map(LanguageCode::normalize(...), $skipLanguages);
+			$keptLanguages = array_map(LanguageCode::normalize(...), $keepLanguages);
+			$writer = new LanguageFileWriter;
+			$recordFailure = function (string $language, string $message) use (&$languageResults, &$errors): void {
+				$languageResults[$language] = [
+					'success' => false,
+					'message' => $message,
+				];
+				$errors[] = "{$language}: {$message}";
+			};
 
 			foreach ($languages as $language) {
+				if (in_array(LanguageCode::normalize($language), $skippedLanguages, true)) {
+					$recordFailure($language, 'Skipped because this language was not pushed successfully.');
+
+					continue;
+				}
+
+				if (in_array(LanguageCode::normalize($language), $keptLanguages, true)) {
+					$languageResults[$language] = [
+						'success' => true,
+						'message' => 'Not pulled because its upload was skipped.',
+					];
+
+					continue;
+				}
+
 				$result = $this->apiClient->downloadLanguageExportWithPrefixFallback($language);
 
 				if ($result['success']) {
-					$languageResults[$language] = ['success' => true];
-
 					$body = $result['body'] ?? null;
 					if (is_string($body) && $body !== '') {
-						$decoded = json_decode($body, true);
-						if (is_array($decoded)) {
-							$maxKeysProcessed = max($maxKeysProcessed, count(array_keys($decoded)));
-						}
+						try {
+							$maxKeysProcessed = max($maxKeysProcessed, $writer->write($language, $body));
+						} catch (InvalidTranslationFileException|TranslationFileWriteException $e) {
+							$recordFailure($language, $e->getMessage());
 
-						$this->writeDownloadedTranslations($language, $body);
+							continue;
+						}
 					}
+
+					$languageResults[$language] = ['success' => true];
 				} else {
-					$message = $result['message'] ?? 'Failed to fetch export URL for this language.';
-					$languageResults[$language] = [
-						'success' => false,
-						'message' => $message,
-					];
-					$errors[] = "{$language}: {$message}";
+					$recordFailure($language, $result['message'] ?? 'Failed to fetch export URL for this language.');
 				}
 			}
 
@@ -108,25 +136,8 @@ final class PullTranslations
 			return new SyncResult(
 				overallSuccess: false,
 				errors: [$e->getMessage()],
+				aborted: true,
 			);
-		}
-	}
-
-	private function writeDownloadedTranslations(string $language, string $body): void
-	{
-		File::ensureDirectoryExists(lang_path());
-
-		$normalizedLanguage = strtolower($language);
-		$decoded = json_decode($body, true) ?? [];
-		$flags = config('linguist.pull_minified', false)
-			? JSON_UNESCAPED_UNICODE
-			: JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE;
-		File::put(lang_path("{$normalizedLanguage}.json"), json_encode($decoded, $flags) . "\n");
-
-		// Cleanup legacy managed file format (lang/DE/linguist.json) to avoid stale overrides.
-		$legacyPath = lang_path(strtoupper($language) . '/linguist.json');
-		if (File::exists($legacyPath)) {
-			File::delete($legacyPath);
 		}
 	}
 }

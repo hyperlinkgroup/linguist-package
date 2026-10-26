@@ -9,6 +9,7 @@ final class SyncResult
 	/**
 	 * @param  array<string, array{success: bool, message?: string}>  $languageResults
 	 * @param  array<string>  $errors
+	 * @param  bool  $aborted  The run stopped unexpectedly, so per-language results are incomplete
 	 */
 	public function __construct(
 		public readonly bool $overallSuccess,
@@ -16,6 +17,7 @@ final class SyncResult
 		public readonly array $errors = [],
 		public readonly int $keysProcessed = 0,
 		public readonly int $keysFailed = 0,
+		public readonly bool $aborted = false,
 	) {}
 
 	public function hasPartialSuccess(): bool
