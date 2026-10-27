@@ -52,7 +52,7 @@ final class LanguageFileWriter
 			throw new InvalidTranslationFileException("Downloaded translations for '{$language}' are empty.");
 		}
 
-		// Content checks on the decoded catalog (see LGT-202) belong here, before the file is replaced.
+		// Content checks on the decoded catalog belong here, before the file is replaced.
 
 		$flags = config('linguist.pull_minified', false)
 			? JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES
@@ -88,7 +88,15 @@ final class LanguageFileWriter
 	{
 		// Write through a symlink to its target instead of replacing the link itself.
 		clearstatcache(true, $path);
-		$targetPath = realpath($path) ?: $path;
+		$targetPath = realpath($path);
+
+		if ($targetPath === false) {
+			if (is_link($path)) {
+				throw new TranslationFileWriteException("'{$path}' is a symlink whose target does not exist.");
+			}
+
+			$targetPath = $path;
+		}
 
 		$temporaryPath = @tempnam(dirname($targetPath), basename($targetPath));
 

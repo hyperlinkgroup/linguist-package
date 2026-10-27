@@ -2,6 +2,7 @@
 
 use Hyperlinkgroup\Linguist\Exceptions\InvalidLanguageCodeException;
 use Hyperlinkgroup\Linguist\Exceptions\InvalidTranslationFileException;
+use Hyperlinkgroup\Linguist\Exceptions\TranslationFileWriteException;
 use Hyperlinkgroup\Linguist\Services\LanguageFileWriter;
 use Illuminate\Support\Facades\File;
 
@@ -147,6 +148,18 @@ test('writes through a symlinked language file instead of replacing the link', f
 
 	expect(is_link(lang_path('de.json')))->toBeTrue()
 		->and(json_decode(File::get(lang_path('shared/de.json')), true))->toBe(['hello' => 'Neu']);
+
+	unlink(lang_path('de.json'));
+});
+
+test('refuses to replace a symlink whose target is missing', function () {
+	File::ensureDirectoryExists(lang_path());
+	symlink(lang_path('shared/de.json'), lang_path('de.json'));
+
+	expect(fn () => (new LanguageFileWriter)->write('DE', '{"hello": "Neu"}'))
+		->toThrow(TranslationFileWriteException::class);
+
+	expect(is_link(lang_path('de.json')))->toBeTrue();
 
 	unlink(lang_path('de.json'));
 });

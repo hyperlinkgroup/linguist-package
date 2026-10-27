@@ -144,7 +144,7 @@ php artisan linguist:sync --push --overwrite
 php artisan linguist:sync --push --languages=EN,DE
 ```
 
-`--prune-remote-keys` deletes remote keys that no longer exist locally before upload (sync mode).
+`--prune-remote-keys` deletes remote keys that no longer exist locally before upload (sync mode). Nothing is pruned while a local translation file is not valid JSON.
 `--no-activate-missing-languages` skips activating local languages that are not yet active in the remote project. Applies to all modes. If omitted, the command prompts interactively or activates automatically in non-interactive contexts.
 `--sync-source` controls which side wins for existing keys in sync mode: `remote` (default) keeps the remote value, `local` overwrites with the local value.
 
@@ -156,6 +156,8 @@ Performs a two-phase sync:
 
 - Uploads local keys first (`push`)
 - Downloads the resulting remote state (`pull`) into local files
+- Pulls only languages whose upload succeeded. A language with a failed upload, a failed remote activation or a local file that is not valid JSON keeps its local file and is reported as failed
+- Skips the pull entirely if the upload aborts
 
 ### Pull Mode
 
@@ -163,7 +165,9 @@ Downloads all translations from Linguist and overwrites local files:
 
 - Fetches all active languages
 - Downloads translation files
-- Replaces local files entirely in Laravel native locale JSON format (`lang/en.json`, `lang/de.json`, ...)
+- Replaces each local file entirely in Laravel native locale JSON format (`lang/en.json`, `lang/de.json`, ...)
+- Writes each file atomically, so a failed write leaves the existing file untouched
+- Skips a language and reports it as failed if its code is not a valid language tag, the download is not a JSON object, the download is empty while the local file has translations, or the file cannot be written. The existing file stays unchanged
 
 ### Push Mode
 
@@ -271,6 +275,7 @@ All sync operations return detailed `SyncResult` objects with:
 - **Partial success detection**: Identify which languages succeeded or failed
 - **Detailed error messages**: Specific failure reasons per language
 - **Key counts**: Total processed and failed key counts
+- **Abort flag**: `aborted` is `true` if a run stopped unexpectedly, so its per-language results are incomplete
 
 Example output:
 

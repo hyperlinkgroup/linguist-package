@@ -311,6 +311,7 @@ test('sync skips the whole pull when the push fails without per-language results
 
 	expect($result->overallSuccess)->toBeFalse()
 		->and($result->errors)->toContain('Pull phase: Pull skipped because push failed.')
+		->and($result->aborted)->toBeTrue()
 		->and(File::get(lang_path('en.json')))->toBe($enBefore)
 		->and(File::get(lang_path('de.json')))->toBe($deBefore);
 

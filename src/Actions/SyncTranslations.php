@@ -92,6 +92,7 @@ final class SyncTranslations
 				errors: $errors,
 				keysProcessed: $preKeysProcessed + $pushResult->keysProcessed + $pullResult->keysProcessed,
 				keysFailed: $preKeysFailed + $pushResult->keysFailed + $pullResult->keysFailed,
+				aborted: $pushResult->aborted || $pullResult->aborted,
 			);
 
 			if ($result->overallSuccess) {
