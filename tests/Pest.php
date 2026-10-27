@@ -4,7 +4,10 @@ use Hyperlinkgroup\Linguist\Tests\TestCase;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Http;
 
-uses(TestCase::class)->in('.');
+// Testbench ships its own lang/en.json, so every test starts from an empty lang directory.
+uses(TestCase::class)
+	->beforeEach(fn () => cleanTranslationFiles())
+	->in('.');
 
 /**
  * Configure valid Linguist settings for testing.
