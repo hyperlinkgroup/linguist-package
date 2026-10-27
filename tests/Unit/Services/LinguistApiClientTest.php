@@ -330,3 +330,19 @@ test('fetch supported language id map merges languages from project list when gl
 		'DE' => 2,
 	]);
 });
+
+test('export download reports invalid language codes without sending a request', function () {
+	Http::preventStrayRequests();
+
+	$client = new LinguistApiClient(
+		baseUrl: 'https://api.linguist.eu',
+		token: 'test-token',
+		projectSlug: 'test-project',
+	);
+
+	expect($client->downloadLanguageExportWithPrefixFallback('../X'))->toBe([
+		'success' => false,
+		'key_count' => 0,
+		'message' => 'Invalid language code.',
+	]);
+});

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Hyperlinkgroup\Linguist\Services;
 
+use Hyperlinkgroup\Linguist\Support\LanguageCode;
 use Illuminate\Http\Client\PendingRequest;
 use Illuminate\Http\Client\Response;
 use Illuminate\Support\Facades\Http;
@@ -468,6 +469,15 @@ final class LinguistApiClient
 	 */
 	private function downloadLanguageExport(string $languageCode, array $query): array
 	{
+		// The code ends up in the export URL and later in the file path, so refuse it before either is built.
+		if (! LanguageCode::isValid($languageCode)) {
+			return [
+				'success' => false,
+				'key_count' => 0,
+				'message' => 'Invalid language code.',
+			];
+		}
+
 		$exportRouteResponse = $this->getExportUrl($languageCode, $query);
 
 		if (! $exportRouteResponse->successful()) {

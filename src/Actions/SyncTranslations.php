@@ -7,6 +7,7 @@ namespace Hyperlinkgroup\Linguist\Actions;
 use Hyperlinkgroup\Linguist\DTO\SyncResult;
 use Hyperlinkgroup\Linguist\Events\SyncCompleted;
 use Hyperlinkgroup\Linguist\Services\LinguistApiClient;
+use Hyperlinkgroup\Linguist\Support\LanguageCode;
 use Lorisleiva\Actions\Concerns\AsAction;
 
 final class SyncTranslations
@@ -40,11 +41,19 @@ final class SyncTranslations
 			$preKeysFailed = 0;
 
 			if ($pruneRemoteKeys) {
-				$localKeys = $this->collectLocalKeySet($projectSlug);
-				$pruneResult = $this->pruneRemoteKeysNotPresentLocally($localKeys);
-				$preErrors = array_merge($preErrors, $pruneResult['errors']);
-				$preKeysProcessed += $pruneResult['processed'];
-				$preKeysFailed += $pruneResult['failed'];
+				$unreadableFiles = CollectLocalTranslations::findUnreadableFiles($projectSlug);
+
+				// Keys from a broken local file look deleted locally, so pruning would remove them remotely.
+				if ($unreadableFiles !== []) {
+					$preErrors[] = 'Skipped pruning remote keys because local files are not valid JSON: '
+						. implode(', ', array_merge(...array_values($unreadableFiles))) . '.';
+				} else {
+					$localKeys = $this->collectLocalKeySet($projectSlug);
+					$pruneResult = $this->pruneRemoteKeysNotPresentLocally($localKeys);
+					$preErrors = array_merge($preErrors, $pruneResult['errors']);
+					$preKeysProcessed += $pruneResult['processed'];
+					$preKeysFailed += $pruneResult['failed'];
+				}
 			}
 
 			$pushResult = $uploadLanguages === null
@@ -56,10 +65,19 @@ final class SyncTranslations
 					onProgress: $onPushProgress,
 					emitEvent: false,
 				);
-			$pullResult = (new PullTranslations($this->apiClient))->handle(
-				projectSlug: $projectSlug,
-				emitEvent: false,
-			);
+			// Pulling a language that was not pushed would overwrite local keys that never reached the server.
+			// Languages with pre-results were not uploaded at all: a failed one is skipped as an error,
+			// a deliberately skipped one (--no-activate-missing-languages) is left alone without failing.
+			[$deliberatelySkipped, $failedBeforePush] = collect($preLanguageResults)
+				->partition(static fn (array $result): bool => $result['success']);
+			$pullResult = $pushResult->aborted
+				? new SyncResult(overallSuccess: false, errors: ['Pull skipped because push failed.'])
+				: (new PullTranslations($this->apiClient))->handle(
+					projectSlug: $projectSlug,
+					emitEvent: false,
+					skipLanguages: [...$failedBeforePush->keys()->all(), ...$pushResult->getFailedLanguages()],
+					keepLanguages: $deliberatelySkipped->keys()->all(),
+				);
 
 			$languageResults = $this->mergeLanguageResults($pushResult, $pullResult, $preLanguageResults);
 			$errors = array_values(array_unique(array_merge(
@@ -74,6 +92,7 @@ final class SyncTranslations
 				errors: $errors,
 				keysProcessed: $preKeysProcessed + $pushResult->keysProcessed + $pullResult->keysProcessed,
 				keysFailed: $preKeysFailed + $pushResult->keysFailed + $pullResult->keysFailed,
+				aborted: $pushResult->aborted || $pullResult->aborted,
 			);
 
 			if ($result->overallSuccess) {
@@ -86,6 +105,7 @@ final class SyncTranslations
 			return new SyncResult(
 				overallSuccess: false,
 				errors: [$e->getMessage()],
+				aborted: true,
 			);
 		}
 	}
@@ -98,28 +118,36 @@ final class SyncTranslations
 	 */
 	private function mergeLanguageResults(SyncResult $pushResult, SyncResult $pullResult, array $preLanguageResults = []): array
 	{
+		// The pull may name a language differently (PT-BR vs. local PT_BR); report it under the local key.
+		$localKeys = collect([...array_keys($preLanguageResults), ...array_keys($pushResult->languageResults)])
+			->mapWithKeys(static fn (string $language): array => [LanguageCode::normalize($language) => $language]);
+		$pullLanguageResults = collect($pullResult->languageResults)
+			->mapWithKeys(static fn (array $result, string $language): array => [$localKeys->get(LanguageCode::normalize($language), $language) => $result])
+			->all();
+
 		$allLanguages = collect([
 			...array_keys($preLanguageResults),
 			...array_keys($pushResult->languageResults),
-			...array_keys($pullResult->languageResults),
+			...array_keys($pullLanguageResults),
 		])->unique();
 
-		$mergedResults = $allLanguages->mapWithKeys(function (string $language) use ($pushResult, $pullResult): array {
+		$mergedResults = $allLanguages->mapWithKeys(function (string $language) use ($pushResult, $pullLanguageResults, $preLanguageResults): array {
+			$preLanguageResult = $preLanguageResults[$language] ?? ['success' => true];
 			$pushLanguageResult = $pushResult->languageResults[$language] ?? ['success' => true];
-			$pullLanguageResult = $pullResult->languageResults[$language] ?? ['success' => true];
+			$pullLanguageResult = $pullLanguageResults[$language] ?? ['success' => true];
 
 			$result = [
-				'success' => $pushLanguageResult['success'] && $pullLanguageResult['success'],
+				'success' => $preLanguageResult['success'] && $pushLanguageResult['success'] && $pullLanguageResult['success'],
 			];
 
 			$message = collect([
-				isset($pushLanguageResult['message']) && $pushLanguageResult['message'] !== ''
-					? "Push: {$pushLanguageResult['message']}"
-					: null,
-				isset($pullLanguageResult['message']) && $pullLanguageResult['message'] !== ''
-					? "Pull: {$pullLanguageResult['message']}"
-					: null,
-			])->filter()->implode(' | ');
+				'' => $preLanguageResult,
+				'Push: ' => $pushLanguageResult,
+				'Pull: ' => $pullLanguageResult,
+			])
+				->filter(static fn (array $phaseResult): bool => filled($phaseResult['message'] ?? null))
+				->map(static fn (array $phaseResult, string $prefix): string => $prefix . $phaseResult['message'])
+				->implode(' | ');
 
 			if ($message !== '') {
 				$result['message'] = $message;
@@ -128,7 +156,7 @@ final class SyncTranslations
 			return [$language => $result];
 		});
 
-		return [...$preLanguageResults, ...$mergedResults->all()];
+		return $mergedResults->all();
 	}
 
 	/**
@@ -154,10 +182,12 @@ final class SyncTranslations
 
 		$languageResults = [];
 		$errors = [];
+		$reportedLanguageCodes = [];
 
 		if ($missingLanguageCodes !== [] && $activateMissingLanguages) {
 			$activationResult = $this->activateMissingLanguages($projectSlug, $missingLanguageCodes, $languageMap);
 			$errors = array_merge($errors, $activationResult['errors']);
+			$reportedLanguageCodes = $activationResult['reported_language_codes'];
 			$languageResults = array_merge($languageResults, $activationResult['language_results']);
 			$languageMap = $activationResult['language_map'];
 			$mappedLanguageCodes = array_keys($languageMap);
@@ -165,6 +195,13 @@ final class SyncTranslations
 		}
 
 		if ($missingLanguageCodes !== []) {
+			// E.g. the activation request succeeded, but the refreshed map still lacks the language.
+			$unreportedLanguageCodes = array_diff($missingLanguageCodes, $reportedLanguageCodes);
+
+			if ($activateMissingLanguages && $unreportedLanguageCodes !== []) {
+				$errors[] = 'Failed to activate local languages remotely before upload: ' . implode(', ', $unreportedLanguageCodes) . '.';
+			}
+
 			foreach ($missingLanguageCodes as $languageCode) {
 				$languageResults[$languageCode] = [
 					'success' => ! $activateMissingLanguages,
@@ -188,7 +225,8 @@ final class SyncTranslations
 	 * @return array{
 	 * 	language_map: array<string, int>,
 	 * 	language_results: array<string, array{success: bool, message?: string}>,
-	 * 	errors: array<string>
+	 * 	errors: array<string>,
+	 * 	reported_language_codes: array<string>
 	 * }
 	 */
 	private function activateMissingLanguages(string $projectSlug, array $missingLanguageCodes, array $currentLanguageMap): array
@@ -204,6 +242,7 @@ final class SyncTranslations
 				'language_map' => $currentLanguageMap,
 				'language_results' => $languageResults,
 				'errors' => $errors,
+				'reported_language_codes' => $missingLanguageCodes,
 			];
 		}
 
@@ -217,6 +256,7 @@ final class SyncTranslations
 				'language_map' => $currentLanguageMap,
 				'language_results' => $languageResults,
 				'errors' => $errors,
+				'reported_language_codes' => $missingLanguageCodes,
 			];
 		}
 
@@ -242,6 +282,9 @@ final class SyncTranslations
 			->values()
 			->all();
 
+		// Languages already named by an error here, so the caller does not report them a second time.
+		$reportedLanguageCodes = $unresolvableLanguageCodes;
+
 		if ($idsToActivate !== []) {
 			$updatedTargetLanguageIds = array_values(array_unique(array_merge($currentTargetIds, $idsToActivate)));
 			$updateResponse = $this->apiClient->updateProject([
@@ -250,9 +293,17 @@ final class SyncTranslations
 
 			if (! $updateResponse->successful()) {
 				$errors[] = 'Failed to activate missing local languages remotely: ' . $updateResponse->body();
+				$reportedLanguageCodes = $missingLanguageCodes;
 			} else {
 				$freshMap = $this->apiClient->getProjectLanguageIdMap();
-				$currentLanguageMap = $freshMap !== [] ? $freshMap : $currentLanguageMap;
+
+				if ($freshMap === []) {
+					$activatedLanguageCodes = $languageIdsByCode->filter(static fn (mixed $languageId): bool => $languageId !== null)->keys()->all();
+					$errors[] = 'Activated local languages remotely, but could not reload their IDs for upload: ' . implode(', ', $activatedLanguageCodes) . '.';
+					$reportedLanguageCodes = $missingLanguageCodes;
+				} else {
+					$currentLanguageMap = $freshMap;
+				}
 			}
 		}
 
@@ -273,6 +324,7 @@ final class SyncTranslations
 			'language_map' => $currentLanguageMap,
 			'language_results' => $languageResults,
 			'errors' => $errors,
+			'reported_language_codes' => $reportedLanguageCodes,
 		];
 	}
 

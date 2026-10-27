@@ -328,3 +328,77 @@ test('push uploads existing remote keys when overwrite is true', function () {
 		return $request->url() === 'https://api.linguist.eu/v2/projects/test-project/translation-keys?per_page=100&page=1';
 	});
 });
+
+test('push without local translation files fails without marking the run as aborted', function () {
+	Http::preventStrayRequests();
+
+	$client = new LinguistApiClient(
+		baseUrl: 'https://api.linguist.eu',
+		token: 'test-token',
+		projectSlug: 'test-project',
+	);
+
+	$result = (new PushTranslations($client))->handle('test-project');
+
+	expect($result->overallSuccess)->toBeFalse()
+		->and($result->aborted)->toBeFalse()
+		->and($result->errors)->toBe(['No local translation files found.']);
+});
+
+test('push marks the run as aborted when it stops unexpectedly', function () {
+	createTestTranslationFiles('test-project', ['EN']);
+
+	Http::preventStrayRequests();
+	Http::fake([
+		'https://api.linguist.eu/v2/projects?per_page=100' => Http::failedConnection(),
+	]);
+
+	$client = new LinguistApiClient(
+		baseUrl: 'https://api.linguist.eu',
+		token: 'test-token',
+		projectSlug: 'test-project',
+	);
+
+	$result = (new PushTranslations($client))->handle('test-project');
+
+	expect($result->overallSuccess)->toBeFalse()
+		->and($result->aborted)->toBeTrue();
+});
+
+test('push reports a language with an unreadable local file as failed', function () {
+	createTestTranslationFiles('test-project', ['EN']);
+	File::put(lang_path('de.json'), '{"hello": "Hallo",}');
+
+	Http::preventStrayRequests();
+	Http::fake([
+		'https://api.linguist.eu/v2/projects?per_page=100' => Http::response([
+			'data' => [[
+				'slug' => 'test-project',
+				'languages' => [
+					['id' => 10, 'code' => 'EN'],
+					['id' => 20, 'code' => 'DE'],
+				],
+			]],
+		], 200),
+		'https://api.linguist.eu/v2/projects/test-project/translation-keys?per_page=100&page=1' => Http::response([
+			'data' => [],
+		], 200),
+		'https://api.linguist.eu/v2/projects/test-project/translation-keys' => Http::response([
+			'data' => ['id' => 1],
+		], 200),
+	]);
+
+	$client = new LinguistApiClient(
+		baseUrl: 'https://api.linguist.eu',
+		token: 'test-token',
+		projectSlug: 'test-project',
+	);
+
+	$result = (new PushTranslations($client))->handle('test-project');
+	$message = "Local file '" . lang_path('de.json') . "' is not valid JSON.";
+
+	expect($result->overallSuccess)->toBeFalse()
+		->and($result->languageResults['DE'])->toBe(['success' => false, 'message' => $message])
+		->and($result->languageResults['EN']['success'])->toBeTrue()
+		->and($result->errors)->toBe(["DE: {$message}"]);
+});
